@@ -1,0 +1,4 @@
+beautifulsoup4==4.12.2
+langdetect==1.0.9
+nltk==3.8.1
+lxml==4.9.3
