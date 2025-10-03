@@ -42,20 +42,61 @@
 - Поля: `original_id`, `title`, `content`, `language_code`, `entities_json`, `quality_score`, etc.
 - Система предотвращения дубликатов
 
-#### 4. **Инструменты управления**
-- Скрипты обработки, просмотра и экспорта данных
-- Статистика и мониторинг процесса
+#### 4. **Дедупликация и кластеризация (src/dedup/)**
+
+- Таблицы:
+
+  * vectors — эмбеддинги для normalized_articles.id (модель SentenceTransformers),
+
+  * story_clusters — агрегаты сюжета (headline, first/last_time, домены, ссылки, факторы, hotness),
+
+  * cluster_members — связь документ ↔ кластер с time_utc, site, url,
+
+  * dedup_state — прогресс инкрементальной обработки.
+
+- Индекс: FAISS (cosine, IndexFlatIP), поддержка инкремента.
+
+- Решение по соседям: два порога cosine
+
+  * τ_dup = 0.95 → явный дубль,
+
+  * τ_story = 0.89 → тот же сюжет при совпадении языка и в окне ±48h.
+
+- Ссылки в сюжете: earliest / strongest / latest (strongest выбирается по весу домена).
+
+#### 5. **Hotness‑скоринг (бейзлайн)**
+
+Вычисляется при каждом пополнении кластера (см. recompute_scores()):
+
+- hotness = 0.30*novelty + 0.20*source + 0.20*velocity + 0.15*confirmation + 0.10*materiality + 0.05*breadth
+
+- novelty: 1.0 если first_time ≤ 6h, иначе 0.3
+
+- source: макс. вес домена (напр. sec.gov=1.0, reuters/bloomberg=0.9, ft/wsj=0.85, cnbc=0.8, иначе 0.5)
+
+- velocity: sigmoid(log(doc_count+1))
+
+- confirmation: min(#уникальных_доменов / 4, 1.0)
+
+- materiality: 0.3 (плейсхолдер — можно поднять при наличии релевантных сущностей)
+
+- breadth: 0.0 (плейсхолдер — широта охвата по entities)
 
 ## Структура проекта
 
 ```
 AiAlphaPulse/
-├── src/normalization/          # Модуль нормализации данных
-│   ├── __init__.py            # Инициализация модуля
-│   ├── normalizer.py          # Основной класс нормализации
-│   ├── database_schema.py     # Схема базы данных
-│   ├── process_articles.py    # Обработка статей
-│   └── export_to_json.py      # Экспорт в JSON
+├── src/
+│ ├── normalization/
+│ │   ├── normalizer.py
+│ │   ├── database_schema.py
+│ │   └── process_articles.py
+│ └── dedup/
+│     ├── schema.py
+│     ├── embedder.py
+│     ├── index_faiss.py
+│     ├── logic.py
+│     └── runner.py
 ├── data/
 │   └── rss_articles.db        # База данных с новостями
 ├── process_articles.py         # Скрипт обработки статей
@@ -112,7 +153,7 @@ AiAlphaPulse/
 pip install -r requirements.txt
 ```
 
-### 2. Подготовка данных
+### 2. нормализация
 ```bash
 # Обработка статей из базы данных
 python process_articles.py --unprocessed
@@ -121,7 +162,7 @@ python process_articles.py --unprocessed
 python process_articles.py --stats
 ```
 
-### 3. Просмотр результатов
+2.1. Просмотр результатов
 ```bash
 # Статистика нормализованных данных
 python view_articles.py --stats
@@ -130,12 +171,23 @@ python view_articles.py --stats
 python view_articles.py --limit 10 --min-quality 0.9
 ```
 
-### 4. Экспорт данных
+2.2. Экспорт данных
 ```bash
 # Экспорт высококачественных статей
 python export_articles.py --high-quality --output hot_news.json
 ```
+### 3. Построить кластеры и hotness (инкрементально)
+```
+python -m src.dedup.runner --db data/rss_articles.db
+```
+Результат: заполнены vectors, story_clusters, cluster_members. В консоли — количество обработанных статей.
 
+3.1 Экспорт топ‑сюжетов (опционально)
+
+```
+python -m scripts.export_topk --db data/rss_articles.db --out radar_top.json --top-k 10 --window-hours 48
+```
+На выходе radar_top.json с карточками: dedup_group, headline, hotness, sources (earliest/strongest/latest), timeline, domains, factors, doc_count
 ## Алгоритм работы
 
 ### Этап 1: Нормализация

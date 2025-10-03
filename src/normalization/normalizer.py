@@ -22,7 +22,6 @@ class NewsNormalizer:
         self.spam_patterns = [
             r'реклама',
             r'спонсор',
-            r'партнер',
             r'купить\s+сейчас',
             r'скидка\s+\d+%',
             r'только\s+сегодня',
