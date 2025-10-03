@@ -46,7 +46,33 @@ class NewsNormalizer:
             nltk.data.find('corpora/wordnet')
         except LookupError:
             nltk.download('wordnet')
-    
+
+    #поправляем title == content
+    def _make_title_from_content(self, content: str) -> str:
+        if not content: return ""
+        txt = content.strip()
+        # берём первое «предложение» до .!? или до ~140-160 символов
+        m = re.search(r"(.{40,160}?[\.!\?…])\s", txt)
+        if m:
+            cand = m.group(1).strip()
+        else:
+            cand = txt[:160].strip()
+            if len(cand) == 160:
+                cand = cand.rsplit(" ", 1)[0].strip() + "…"
+        # уберём лишние эмодзи/хештеги
+        cand = re.sub(r"[\U0001F300-\U0001FAFF]+", "", cand)
+        cand = re.sub(r"\s+", " ", cand).strip()
+        return cand
+
+    def _title_needs_fix(self, title: str, content: str) -> bool:
+        if not title: return True
+        t = title.strip(); c = (content or "").strip()
+        if not c: return False
+        if t == c: return True
+        if c.startswith(t) and len(t) >= 0.8 * min(len(c), 200): return True
+        if len(t) > 180: return True
+        return False
+
     def clean_html(self, text: str) -> str:
         """Очистка HTML тегов и декодирование HTML entities"""
         if not text:
@@ -181,6 +207,13 @@ class NewsNormalizer:
         # Очистка и нормализация текста
         normalized_content = self.normalize_text(article.get('content', ''))
         normalized_title = self.normalize_text(article.get('title', ''))
+
+        # фиксим заголовок при необходимости
+        if self._title_needs_fix(normalized_title, normalized_content):
+            fixed_title = self._make_title_from_content(normalized_content)
+            if fixed_title:
+                normalized_title = fixed_title
+                # можно слегка наказать quality_score позже, например -0.05
         
         if not normalized_content or len(normalized_content.strip()) < 50:
             return None
