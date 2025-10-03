@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: rss_postgres
+    environment:
+      POSTGRES_DB: rss_db
+      POSTGRES_USER: rss_user
+      POSTGRES_PASSWORD: rss_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rss_user -d rss_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rss_network
+
+  # FastAPI приложение
+  rss_parser:
+    build: .
+    container_name: rss_parser_app
+    environment:
+      DATABASE_URL: postgresql://rss_user:rss_password@postgres:5432/rss_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - rss_network
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo '🔄 Инициализация базы данных...' &&
+        python init_db.py &&
+        echo '🚀 Запуск FastAPI приложения...' &&
+        uvicorn main:app --host 0.0.0.0 --port 8000
+      "
+
+  # pgAdmin для управления базой данных (опционально)
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: rss_pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@rss.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin123
+  #   ports:
+  #     - "8080:80"
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - rss_network
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  rss_network:
+    driver: bridge

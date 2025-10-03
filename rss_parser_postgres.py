@@ -31,8 +31,8 @@ RSS_URLS = [
     # 'https://www.businessinsider.com/rss',
 
 
-    # "https://smart-lab.ru/news/rss/",
-    # "https://smart-lab.ru/forum/rss/",
+    "https://smart-lab.ru/news/rss/",
+    "https://smart-lab.ru/forum/rss/",
     
     # # ----------------------------------------------------
     # # РОССИЙСКИЕ / РУССКОЯЗЫЧНЫЕ
