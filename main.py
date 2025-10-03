@@ -8,7 +8,7 @@ import threading
 import time
 from datetime import datetime
 import uvicorn
-from rss_parser_postgres import parse_and_save_rss, check_articles, get_articles_stats, setup_database
+from rss_parser import parse_and_save_rss, check_articles, get_articles_stats, setup_database
 
 # Lifespan event handler
 @asynccontextmanager

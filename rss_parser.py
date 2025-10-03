@@ -4,8 +4,10 @@ from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime
+from dotenv import load_dotenv
 import re
 import time
+import os
 
 
     # # Investopedia (Все статьи)
@@ -30,8 +32,8 @@ RSS_URLS = [
     # 'https://www.businessinsider.com/rss',
 
 
-    # "https://smart-lab.ru/news/rss/",
-    # "https://smart-lab.ru/forum/rss/",
+    "https://smart-lab.ru/news/rss/",
+    "https://smart-lab.ru/forum/rss/",
     
     # # ----------------------------------------------------
     # # РОССИЙСКИЕ / РУССКОЯЗЫЧНЫЕ
@@ -64,9 +66,9 @@ RSS_URLS = [
     # 'https://www.kommersant.ru/RSS/news.xml',  # Коммерсантъ - работает
 ]
 
-# Имя файла базы данных SQLite
-DATABASE_FILE = 'rss_articles.db'
-DATABASE_URL = f"sqlite:///{DATABASE_FILE}"
+# PostgreSQL настройки
+load_dotenv()
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://rss_user:rss_password@localhost:5432/rss_db')
 
 # --- 2. Определение модели БД (SQLAlchemy) ---
 Base = declarative_base()
@@ -286,10 +288,11 @@ def parse_and_save_rss():
         session.commit()
         print(f"\n✅ Успешно завершено.")
         print(f"   Всего добавлено новых записей в БД: {global_new_count}")
-        print(f"   Файл базы данных: {DATABASE_FILE}")
+        return global_new_count
     except Exception as e:
         session.rollback()
         print(f"\n❌ Критическая ошибка при фиксации транзакции: {e}")
+        return 0
     finally:
         session.close()
 
@@ -300,32 +303,33 @@ def check_articles(limit=10):
     # Запрос всех статей, отсортированных по ID (последние добавленные внизу)
     articles = session.query(Article).order_by(Article.id.desc()).limit(limit).all()
     
-    print(f"\n--- Последние {len(articles)} статей из базы данных ({DATABASE_FILE}) ---")
+    print(f"\n--- Последние {len(articles)} статей из базы данных ---")
     if not articles:
         print("База данных пуста.")
-        return
+        return []
     
+    result = []
     for article in articles:
-        print("-" * 60)
-        print(f"ID: {article.id}")
-        print(f"Источник: {article.source}")
-        print(f"Заголовок: {article.title}")
-        print(f"Автор: {article.author or 'Не указан'}")
-        print(f"Категория: {article.category or 'Не указана'}")
-        print(f"Дата публикации: {article.published.strftime('%Y-%m-%d %H:%M:%S') if article.published else 'Нет данных'}")
-        print(f"Дата добавления: {article.created_at.strftime('%Y-%m-%d %H:%M:%S') if article.created_at else 'Нет данных'}")
-        print(f"Слов: {article.word_count or 0}")
-        print(f"Время чтения: {article.reading_time or 0} мин")
-        print(f"Обработана: {'Да' if article.is_processed else 'Нет'}")
-        print(f"Ссылка: {article.link}")
-        if article.image_url:
-            print(f"Изображение: {article.image_url}")
-        if article.summary:
-            print(f"Краткое описание: {article.summary[:200]}{'...' if len(article.summary) > 200 else ''}")
-        if article.content:
-            print(f"Полный текст: {article.content[:300]}{'...' if len(article.content) > 300 else ''}")
-        
+        article_data = {
+            'id': article.id,
+            'source': article.source,
+            'title': article.title,
+            'author': article.author or 'Не указан',
+            'category': article.category or 'Не указана',
+            'published': article.published.strftime('%Y-%m-%d %H:%M:%S') if article.published else 'Нет данных',
+            'created_at': article.created_at.strftime('%Y-%m-%d %H:%M:%S') if article.created_at else 'Нет данных',
+            'word_count': article.word_count or 0,
+            'reading_time': article.reading_time or 0,
+            'is_processed': article.is_processed,
+            'link': article.link,
+            'image_url': article.image_url,
+            'summary': article.summary,
+            'content': article.content
+        }
+        result.append(article_data)
+    
     session.close()
+    return result
 
 def get_articles_stats():
     """Показывает статистику по статьям в базе данных."""
@@ -341,18 +345,12 @@ def get_articles_stats():
     avg_words = session.query(Article.word_count).filter(Article.word_count.isnot(None)).all()
     avg_words = sum([w[0] for w in avg_words]) / len(avg_words) if avg_words else 0
     
-    print(f"\n--- Статистика базы данных ---")
-    print(f"Всего статей: {total_articles}")
-    print(f"Обработано: {processed_articles}")
-    print(f"Среднее количество слов: {avg_words:.0f}")
-    print(f"\nСтатьи по источникам:")
-    for source, count in sources:
-        print(f"  {source}: {count}")
+    stats = {
+        'total_articles': total_articles,
+        'processed_articles': processed_articles,
+        'avg_words': round(avg_words, 0),
+        'sources': [{'source': source, 'count': count} for source, count in sources]
+    }
     
     session.close()
-
-# --- БЛОК ЗАПУСКА ---
-if __name__ == "__main__":
-    parse_and_save_rss()
-    # check_articles(limit=5)  # Выводим последние 5 добавленных статей
-    # get_articles_stats()  # Показываем статистику
+    return stats
