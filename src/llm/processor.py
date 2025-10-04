@@ -17,7 +17,7 @@ class LLMNewsProcessor:
     """Процессор для анализа новостей через LLM"""
     
     def __init__(self, conn: psycopg2.extensions.connection, api_key: str = None, 
-                 model: str = "openai/gpt-3.5-turbo"):
+                 model: str = None):
         self.conn = conn
         self.llm_client = OpenRouterClient(api_key=api_key, model=model)
         

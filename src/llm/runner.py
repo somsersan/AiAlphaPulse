@@ -37,10 +37,10 @@ def main():
     
     parser.add_argument('--limit', type=int, default=10,
                         help='Количество кластеров для обработки (default: 10)')
-    parser.add_argument('--model', default='openai/gpt-3.5-turbo',
-                        help='Модель для использования (default: openai/gpt-3.5-turbo)')
-    parser.add_argument('--delay', type=float, default=1.0,
-                        help='Задержка между запросами в секундах (default: 1.0)')
+    parser.add_argument('--model', default=None,
+                        help='Модель для использования (default: из LLM_MODEL или deepseek/deepseek-chat)')
+    parser.add_argument('--delay', type=float, default=float(os.getenv('LLM_DELAY', '1.0')),
+                        help='Задержка между запросами в секундах (default: из LLM_DELAY или 1.0)')
     parser.add_argument('--api-key', 
                         help='OpenRouter API ключ (или используйте OPENROUTER_API_KEY)')
     parser.add_argument('--show-top', type=int, metavar='N',
