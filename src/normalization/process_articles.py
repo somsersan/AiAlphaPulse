@@ -77,11 +77,11 @@ class ArticleProcessor:
         with get_db_cursor() as cursor:
             # Получаем общее количество статей
             cursor.execute("SELECT COUNT(*) FROM articles")
-            total_articles = cursor.fetchone()[0]
+            total_articles = cursor.fetchone()['count']
             
             # Получаем максимальный ID в исходной таблице
             cursor.execute("SELECT MAX(id) FROM articles")
-            max_original_id = cursor.fetchone()[0] or 0
+            max_original_id = cursor.fetchone()['max'] or 0
         
         return {
             'max_processed_id': max_processed_id,

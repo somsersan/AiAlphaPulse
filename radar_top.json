@@ -1,217 +1,68 @@
 {
   "meta": {
-    "generated_at": "2025-10-03T22:45:26.449828Z",
-    "top_k": 20,
-    "window_hours": 48,
-    "db": "data/rss_articles.db"
+    "generated_at": "2025-10-04T14:59:55.779329",
+    "top_k": 10,
+    "window_hours": 24,
+    "db": "PostgreSQL"
   },
   "clusters": [
     {
-      "dedup_group": 146,
-      "headline": "Louis Vuitton подал в Роспатент три заявки на регистрацию товарных знаков",
-      "hotness": 0.665,
+      "dedup_group": 78,
+      "headline": "Нину Гуляеву похоронят на Троекуровском кладбище",
+      "hotness": 0.634,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://tass.ru/ekonomika/25247647"
+          "url": "https://tass.ru/proisshestviya/25250325"
         },
         {
           "kind": "latest",
-          "url": "https://t.me/tass_agency/341909"
+          "url": "https://tass.ru/kultura/25250581"
         },
         {
           "kind": "strongest",
-          "url": "https://tass.ru/ekonomika/25247647"
+          "url": "https://tass.ru/kultura/25250581"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T18:31:19+00:00",
-        "update": "2025-10-03T18:50:29+00:00",
-        "confirm": "2025-10-03T18:50:29+00:00"
+        "first": "2025-10-04T09:12:40",
+        "update": "2025-10-04T10:05:21",
+        "confirm": null
       },
       "domains": [
-        "ТАСС",
-        "@tass_agency"
+        "ТАСС"
       ],
-      "doc_count": 2,
+      "doc_count": 3,
       "factors": {
         "novelty": 1.0,
         "source": 0.5,
-        "velocity": 0.8,
-        "confirmation": 0.5,
+        "velocity": 0.8333333333333334,
+        "confirmation": 0.25,
         "materiality": 0.3,
         "breadth": 0.0
       }
     },
     {
-      "dedup_group": 157,
-      "headline": "ВСУ обстреляли здание кинотеатра в Каховке Херсонскои области",
-      "hotness": 0.665,
+      "dedup_group": 43,
+      "headline": "Колосков: судьям матча ЦСКА - Спартак будет спокои нее без Станковича",
+      "hotness": 0.627,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://tass.ru/proisshestviya/25247557"
+          "url": "https://tass.ru/sport/25250743"
         },
         {
           "kind": "latest",
-          "url": "https://t.me/tass_agency/341905"
+          "url": "https://tass.ru/sport/25250771"
         },
         {
           "kind": "strongest",
-          "url": "https://tass.ru/proisshestviya/25247557"
+          "url": "https://tass.ru/sport/25250771"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T18:11:53+00:00",
-        "update": "2025-10-03T19:01:59.100555+00:00",
-        "confirm": "2025-10-03T19:01:59.100555+00:00"
-      },
-      "domains": [
-        "ТАСС",
-        "@tass_agency"
-      ],
-      "doc_count": 2,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.8,
-        "confirmation": 0.5,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 159,
-      "headline": "В США могут выпустить монеты номиналом 1 с изображением Трампа",
-      "hotness": 0.665,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://tass.ru/mezhdunarodnaya-panorama/25247527"
-        },
-        {
-          "kind": "latest",
-          "url": "https://t.me/tass_agency/341907"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://tass.ru/mezhdunarodnaya-panorama/25247527"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T18:06:50+00:00",
-        "update": "2025-10-03T18:37:28+00:00",
-        "confirm": "2025-10-03T18:37:28+00:00"
-      },
-      "domains": [
-        "ТАСС",
-        "@tass_agency"
-      ],
-      "doc_count": 2,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.8,
-        "confirmation": 0.5,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 162,
-      "headline": "Американскии журнал расхвалил россии скии Ярс",
-      "hotness": 0.665,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://tass.ru/mezhdunarodnaya-panorama/25247467"
-        },
-        {
-          "kind": "latest",
-          "url": "https://t.me/tass_agency/341906"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://tass.ru/mezhdunarodnaya-panorama/25247467"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T18:00:07+00:00",
-        "update": "2025-10-03T18:27:01+00:00",
-        "confirm": "2025-10-03T18:27:01+00:00"
-      },
-      "domains": [
-        "ТАСС",
-        "@tass_agency"
-      ],
-      "doc_count": 2,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.8,
-        "confirmation": 0.5,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 329,
-      "headline": "США нанесли удар по судну в международных водах недалеко от побережья Венесуэлы, заявил американскии министр обороны Пит Хегсет. По его словам, судно перевозило наркотики. Погибли ",
-      "hotness": 0.665,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://t.me/interfaxonline/63327"
-        },
-        {
-          "kind": "latest",
-          "url": "https://t.me/kommersant/92405"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://t.me/interfaxonline/63327"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T17:54:58+00:00",
-        "update": "2025-10-03T19:01:56.888584+00:00",
-        "confirm": "2025-10-03T19:01:56.888584+00:00"
-      },
-      "domains": [
-        "@kommersant",
-        "@interfaxonline"
-      ],
-      "doc_count": 2,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.8,
-        "confirmation": 0.5,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 143,
-      "headline": "В ЛизаАлерт рассказали о ходе поисков пропавшеи под Красноярском семьи",
-      "hotness": 0.628,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://tass.ru/obschestvo/25247619"
-        },
-        {
-          "kind": "latest",
-          "url": "https://tass.ru/obschestvo/25247555"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://tass.ru/obschestvo/25247555"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T18:27:02+00:00",
-        "update": "2025-10-03T18:38:06+00:00",
+        "first": "2025-10-04T10:42:21",
+        "update": "2025-10-04T10:58:57",
         "confirm": null
       },
       "domains": [
@@ -228,30 +79,30 @@
       }
     },
     {
-      "dedup_group": 2,
-      "headline": "Whisper X без докера- простои GUI на Windows",
+      "dedup_group": 33,
+      "headline": "TRT Haber: спецборт с активистами флотилии Сумуд вылетел из Израиля в Турцию",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://habr.com/ru/articles/953320/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953320"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250865"
         },
         {
           "kind": "latest",
-          "url": "https://habr.com/ru/articles/953320/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953320"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250865"
         },
         {
           "kind": "strongest",
-          "url": "https://habr.com/ru/articles/953320/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953320"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250865"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T18:22:31+00:00",
-        "update": "2025-10-03T18:22:31+00:00",
+        "first": "2025-10-04T11:20:40",
+        "update": "2025-10-04T11:20:40",
         "confirm": null
       },
       "domains": [
-        "Все публикации подряд на Хабре"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {
@@ -264,30 +115,30 @@
       }
     },
     {
-      "dedup_group": 3,
-      "headline": "От доминирования на поле боя к доминированию на рынке: чему бизнес может научиться у военных",
+      "dedup_group": 22,
+      "headline": "В Минюсте ФРГ выступили против масштабного участия Бундесвера в защите от БПЛА",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://habr.com/ru/articles/953306/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953306"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250927"
         },
         {
           "kind": "latest",
-          "url": "https://habr.com/ru/articles/953306/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953306"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250927"
         },
         {
           "kind": "strongest",
-          "url": "https://habr.com/ru/articles/953306/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953306"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250927"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T17:23:39+00:00",
-        "update": "2025-10-03T17:23:39+00:00",
+        "first": "2025-10-04T11:41:04",
+        "update": "2025-10-04T11:41:04",
         "confirm": null
       },
       "domains": [
-        "Все публикации подряд на Хабре"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {
@@ -300,30 +151,30 @@
       }
     },
     {
-      "dedup_group": 4,
-      "headline": "Обернитесь, сзади стоит D D. Настолка, покорившая мир",
+      "dedup_group": 27,
+      "headline": "Эксперт Гагкуев оценил обновление системы обучения в вузах России",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://habr.com/ru/companies/timeweb/articles/953302/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953302"
+          "url": "https://tass.ru/obschestvo/25250839"
         },
         {
           "kind": "latest",
-          "url": "https://habr.com/ru/companies/timeweb/articles/953302/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953302"
+          "url": "https://tass.ru/obschestvo/25250839"
         },
         {
           "kind": "strongest",
-          "url": "https://habr.com/ru/companies/timeweb/articles/953302/?utm_source=habrahabr&utm_medium=rss&utm_campaign=953302"
+          "url": "https://tass.ru/obschestvo/25250839"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T17:05:33+00:00",
-        "update": "2025-10-03T17:05:33+00:00",
+        "first": "2025-10-04T11:32:46",
+        "update": "2025-10-04T11:32:46",
         "confirm": null
       },
       "domains": [
-        "Все публикации подряд на Хабре"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {
@@ -336,30 +187,30 @@
       }
     },
     {
-      "dedup_group": 40,
-      "headline": "3M Weighs Multibillion-Dollar Carve-Out in Industrials Arm",
+      "dedup_group": 23,
+      "headline": "В Приморье госпитализировали шестерых детеи , пострадавших в ДТП с автобусом",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/3m-weighs-multibillion-dollar-carve-out-in-industrials-arm"
+          "url": "https://tass.ru/proisshestviya/25250933"
         },
         {
           "kind": "latest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/3m-weighs-multibillion-dollar-carve-out-in-industrials-arm"
+          "url": "https://tass.ru/proisshestviya/25250933"
         },
         {
           "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/3m-weighs-multibillion-dollar-carve-out-in-industrials-arm"
+          "url": "https://tass.ru/proisshestviya/25250933"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T18:12:58+00:00",
-        "update": "2025-10-03T18:12:58+00:00",
+        "first": "2025-10-04T11:39:26",
+        "update": "2025-10-04T11:39:26",
         "confirm": null
       },
       "domains": [
-        "Bloomberg Markets"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {
@@ -372,30 +223,30 @@
       }
     },
     {
-      "dedup_group": 42,
-      "headline": "Palantir Rebuts Claims of Security Flaws After Stock Falls",
+      "dedup_group": 24,
+      "headline": "Даниил Медведев вышел в третии круг Мастерса в Шанхае",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/palantir-rebuts-claims-of-security-flaws-after-stock-falls"
+          "url": "https://tass.ru/sport/25250941"
         },
         {
           "kind": "latest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/palantir-rebuts-claims-of-security-flaws-after-stock-falls"
+          "url": "https://tass.ru/sport/25250941"
         },
         {
           "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/palantir-rebuts-claims-of-security-flaws-after-stock-falls"
+          "url": "https://tass.ru/sport/25250941"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T17:50:38+00:00",
-        "update": "2025-10-03T17:50:38+00:00",
+        "first": "2025-10-04T11:38:51",
+        "update": "2025-10-04T11:38:51",
         "confirm": null
       },
       "domains": [
-        "Bloomberg Markets"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {
@@ -408,30 +259,30 @@
       }
     },
     {
-      "dedup_group": 43,
-      "headline": "Macron Blames Russia for Death of a French Journalist in Ukraine",
+      "dedup_group": 32,
+      "headline": "Несколько колонн автомобилеи направляются в Тбилиси для участия в акции протеста",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/macron-blames-russia-for-death-of-a-french-journalist-in-ukraine"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250883"
         },
         {
           "kind": "latest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/macron-blames-russia-for-death-of-a-french-journalist-in-ukraine"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250883"
         },
         {
           "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/macron-blames-russia-for-death-of-a-french-journalist-in-ukraine"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250883"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T17:49:27+00:00",
-        "update": "2025-10-03T17:49:27+00:00",
+        "first": "2025-10-04T11:22:13",
+        "update": "2025-10-04T11:22:13",
         "confirm": null
       },
       "domains": [
-        "Bloomberg Markets"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {
@@ -444,30 +295,30 @@
       }
     },
     {
-      "dedup_group": 45,
-      "headline": "Flying Blind on Jobs Friday Due to Shutdown Real Yield 10 3 2025",
+      "dedup_group": 28,
+      "headline": "Футболист Гассама считает, что Балтика может стать чемпионом",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/videos/2025-10-03/real-yield-10-3-2025-video"
+          "url": "https://tass.ru/sport/25250913"
         },
         {
           "kind": "latest",
-          "url": "https://www.bloomberg.com/news/videos/2025-10-03/real-yield-10-3-2025-video"
+          "url": "https://tass.ru/sport/25250913"
         },
         {
           "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/videos/2025-10-03/real-yield-10-3-2025-video"
+          "url": "https://tass.ru/sport/25250913"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T17:40:48+00:00",
-        "update": "2025-10-03T17:40:48+00:00",
+        "first": "2025-10-04T11:28:54",
+        "update": "2025-10-04T11:28:54",
         "confirm": null
       },
       "domains": [
-        "Bloomberg Markets"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {
@@ -480,246 +331,30 @@
       }
     },
     {
-      "dedup_group": 48,
-      "headline": "Texas Stock Exchange Trading Expected to Begin in First Quarter",
+      "dedup_group": 30,
+      "headline": "Лукашенко призвал относиться к трудовым мигрантам в Белоруссии как к своим людям",
       "hotness": 0.618,
       "sources": [
         {
           "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/texas-stock-exchange-trading-expected-to-begin-in-first-quarter"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250907"
         },
         {
           "kind": "latest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/texas-stock-exchange-trading-expected-to-begin-in-first-quarter"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250907"
         },
         {
           "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/texas-stock-exchange-trading-expected-to-begin-in-first-quarter"
+          "url": "https://tass.ru/mezhdunarodnaya-panorama/25250907"
         }
       ],
       "timeline": {
-        "first": "2025-10-03T17:20:55+00:00",
-        "update": "2025-10-03T17:20:55+00:00",
+        "first": "2025-10-04T11:26:53",
+        "update": "2025-10-04T11:26:53",
         "confirm": null
       },
       "domains": [
-        "Bloomberg Markets"
-      ],
-      "doc_count": 1,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.75,
-        "confirmation": 0.25,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 49,
-      "headline": "Blank-Check Firm MAK Files for 100 Million IPO in Canada",
-      "hotness": 0.618,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/blank-check-firm-mak-files-for-100-million-ipo-in-canada"
-        },
-        {
-          "kind": "latest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/blank-check-firm-mak-files-for-100-million-ipo-in-canada"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/blank-check-firm-mak-files-for-100-million-ipo-in-canada"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T17:18:58+00:00",
-        "update": "2025-10-03T17:18:58+00:00",
-        "confirm": null
-      },
-      "domains": [
-        "Bloomberg Markets"
-      ],
-      "doc_count": 1,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.75,
-        "confirmation": 0.25,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 52,
-      "headline": "The Stock That Shows How Manic This Market Is Getting",
-      "hotness": 0.618,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/newsletters/2025-10-03/the-stock-that-shows-how-manic-this-market-is-getting"
-        },
-        {
-          "kind": "latest",
-          "url": "https://www.bloomberg.com/news/newsletters/2025-10-03/the-stock-that-shows-how-manic-this-market-is-getting"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/newsletters/2025-10-03/the-stock-that-shows-how-manic-this-market-is-getting"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T16:52:00+00:00",
-        "update": "2025-10-03T16:52:00+00:00",
-        "confirm": null
-      },
-      "domains": [
-        "Bloomberg Markets"
-      ],
-      "doc_count": 1,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.75,
-        "confirmation": 0.25,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 53,
-      "headline": "Morgan Stanley Says Treasury Options See 10- to 29-Day Shutdown",
-      "hotness": 0.618,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/morgan-stanley-says-treasury-options-see-10-to-29-day-shutdown"
-        },
-        {
-          "kind": "latest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/morgan-stanley-says-treasury-options-see-10-to-29-day-shutdown"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/morgan-stanley-says-treasury-options-see-10-to-29-day-shutdown"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T16:49:41+00:00",
-        "update": "2025-10-03T16:49:41+00:00",
-        "confirm": null
-      },
-      "domains": [
-        "Bloomberg Markets"
-      ],
-      "doc_count": 1,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.75,
-        "confirmation": 0.25,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 54,
-      "headline": "Private Credit Risks to Be Assessed by US Government Watchdog",
-      "hotness": 0.618,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/private-credit-risks-to-be-assessed-by-us-government-watchdog"
-        },
-        {
-          "kind": "latest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/private-credit-risks-to-be-assessed-by-us-government-watchdog"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://www.bloomberg.com/news/articles/2025-10-03/private-credit-risks-to-be-assessed-by-us-government-watchdog"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T16:41:41+00:00",
-        "update": "2025-10-03T16:41:41+00:00",
-        "confirm": null
-      },
-      "domains": [
-        "Bloomberg Markets"
-      ],
-      "doc_count": 1,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.75,
-        "confirmation": 0.25,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 67,
-      "headline": "Более миллиона военнослужащих США остались без зарплат из-за шатдауна",
-      "hotness": 0.618,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://www.vedomosti.ru/politics/news/2025/10/03/1144255-ssha-bez-zarplat"
-        },
-        {
-          "kind": "latest",
-          "url": "https://www.vedomosti.ru/politics/news/2025/10/03/1144255-ssha-bez-zarplat"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://www.vedomosti.ru/politics/news/2025/10/03/1144255-ssha-bez-zarplat"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T17:46:16+00:00",
-        "update": "2025-10-03T17:46:16+00:00",
-        "confirm": null
-      },
-      "domains": [
-        "\"Ведомости\". Ежедневная деловая газета"
-      ],
-      "doc_count": 1,
-      "factors": {
-        "novelty": 1.0,
-        "source": 0.5,
-        "velocity": 0.75,
-        "confirmation": 0.25,
-        "materiality": 0.3,
-        "breadth": 0.0
-      }
-    },
-    {
-      "dedup_group": 68,
-      "headline": "Суд в Армении приговорил архиепископа Аджапахяна к двум годам тюрьмы",
-      "hotness": 0.618,
-      "sources": [
-        {
-          "kind": "earliest",
-          "url": "https://www.vedomosti.ru/politics/news/2025/10/03/1144253-sud-prigovoril-arhiepiskopa"
-        },
-        {
-          "kind": "latest",
-          "url": "https://www.vedomosti.ru/politics/news/2025/10/03/1144253-sud-prigovoril-arhiepiskopa"
-        },
-        {
-          "kind": "strongest",
-          "url": "https://www.vedomosti.ru/politics/news/2025/10/03/1144253-sud-prigovoril-arhiepiskopa"
-        }
-      ],
-      "timeline": {
-        "first": "2025-10-03T17:35:28+00:00",
-        "update": "2025-10-03T17:35:28+00:00",
-        "confirm": null
-      },
-      "domains": [
-        "\"Ведомости\". Ежедневная деловая газета"
+        "ТАСС"
       ],
       "doc_count": 1,
       "factors": {

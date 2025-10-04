@@ -148,46 +148,86 @@ AiAlphaPulse/
 
 ## Установка и запуск
 
-### 1. Установка зависимостей
+### Быстрый старт (Рекомендуется)
+
+#### 1. Запуск парсера через Docker
+
 ```bash
-pip install -r requirements.txt
+# Запустить Docker контейнер с парсером
+./start.sh
+
+# Парсер будет автоматически собирать новости каждую минуту
+# Проверить статус: curl http://localhost:8000/health
 ```
 
-### 2. нормализация
+#### 2. Запуск полного пайплайна
+
 ```bash
-# Обработка статей из базы данных
-python process_articles.py --unprocessed
+# Автоматический режим (непрерывный)
+./start_all.sh
+
+# Или с кастомным интервалом (в секундах)
+./start_all.sh 600  # каждые 10 минут
+
+# Однократный запуск (для тестирования)
+./start_once.sh
+```
+
+Пайплайн автоматически выполняет:
+1. ✅ Проверку доступности парсера
+2. ✅ Нормализацию новых статей
+3. ✅ Дедупликацию и кластеризацию
+4. ✅ Экспорт топовых кластеров в `radar_top.json`
+
+### Ручной запуск отдельных компонентов
+
+#### 1. Парсер (Docker)
+```bash
+# Запуск через Docker Compose
+docker-compose up --build -d
+
+# Просмотр логов
+docker-compose logs -f
+
+# Остановка
+docker-compose down
+```
+
+#### 2. Нормализация
+```bash
+# Обработка новых статей
+python -m src.normalization.process_articles --unprocessed
 
 # Просмотр статистики
-python process_articles.py --stats
+python -m src.normalization.process_articles --stats
+
+# Просмотр статуса обработки
+python -m src.normalization.process_articles --status
 ```
 
-2.1. Просмотр результатов
+#### 3. Дедупликация и кластеризация
 ```bash
-# Статистика нормализованных данных
-python view_articles.py --stats
-
-# Просмотр лучших статей
-python view_articles.py --limit 10 --min-quality 0.9
+# Обработка новых нормализованных статей
+python -m src.dedup.runner --k-neighbors 30
 ```
 
-2.2. Экспорт данных
+#### 4. Экспорт топовых кластеров
 ```bash
-# Экспорт высококачественных статей
-python export_articles.py --high-quality --output hot_news.json
+# Экспорт топ-10 кластеров за 48 часов
+python -m src.dedup.export_topk --out radar_top.json --top-k 10 --window-hours 48
 ```
-### 3. Построить кластеры и hotness (инкрементально)
-```
-python -m src.dedup.runner --db data/rss_articles.db
-```
-Результат: заполнены vectors, story_clusters, cluster_members. В консоли — количество обработанных статей.
 
-3.1 Экспорт топ‑сюжетов (опционально)
+### Развертывание на VM
 
-```
-python -m scripts.export_topk --db data/rss_articles.db --out radar_top.json --top-k 10 --window-hours 48
-```
-На выходе radar_top.json с карточками: dedup_group, headline, hotness, sources (earliest/strongest/latest), timeline, domains, factors, doc_count
+Подробная инструкция по развертыванию на виртуальной машине находится в файле [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Основные шаги:
+1. Установка Python 3.11+
+2. Клонирование проекта
+3. Создание виртуального окружения
+4. Установка зависимостей
+5. Запуск через `./start_all.sh`
+6. (Опционально) Настройка как systemd сервиса
 ## Алгоритм работы
 
 ### Этап 1: Нормализация

@@ -98,7 +98,7 @@ def get_unprocessed_articles(conn: psycopg2.extensions.connection, limit: int = 
     if limit:
         query += f" LIMIT {limit}"
     
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute(query, (max_id,))
     rows = cursor.fetchall()
     return [dict(row) for row in rows]

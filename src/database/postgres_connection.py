@@ -12,7 +12,7 @@ class PostgreSQLConnection:
     """Класс для работы с PostgreSQL"""
     
     def __init__(self, 
-                 host: str = "51.250.17.41",
+                 host: str = "130.193.55.244",
                  port: int = 5432,
                  database: str = "alphapulse", 
                  user: str = "admin",

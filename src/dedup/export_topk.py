@@ -49,7 +49,11 @@ def export_topk(output, top_k=10, window_hours=48):
                         links.append({"kind": "strongest", "url": row["url"]})
 
             # таймлайн
-            timeline = {"first": r["first_time"], "update": r["last_time"], "confirm": None}
+            timeline = {
+                "first": r["first_time"].isoformat() if r["first_time"] else None, 
+                "update": r["last_time"].isoformat() if r["last_time"] else None, 
+                "confirm": None
+            }
             # confirm — первая публикация с другого домена
             with get_db_cursor() as cursor:
                 k2 = """
@@ -62,7 +66,7 @@ def export_topk(output, top_k=10, window_hours=48):
                 sites_seen = set()
                 for m in cursor.fetchall():
                     if sites_seen and m["site"] not in sites_seen and not timeline["confirm"]:
-                        timeline["confirm"] = m["time_utc"]
+                        timeline["confirm"] = m["time_utc"].isoformat() if m["time_utc"] else None
                     sites_seen.add(m["site"])
 
             clusters.append({
@@ -78,7 +82,7 @@ def export_topk(output, top_k=10, window_hours=48):
 
         export = {
             "meta": {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": datetime.now().isoformat(),
                 "top_k": top_k,
                 "window_hours": window_hours,
                 "db": "PostgreSQL"
