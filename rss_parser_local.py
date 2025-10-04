@@ -44,7 +44,7 @@ RSS_URLS = [
     # 'https://www.vedomosti.ru/rss/news',
     
     # # Коммерсантъ (Финансы / Рынки)
-    'https://www.kommersant.ru/RSS/finance.xml',
+    # 'https://www.kommersant.ru/RSS/finance.xml',
     # 'https://www.kommersant.ru/RSS/news.xml',  # Коммерсантъ - работает
     
     # Рабочие RSS-ленты
