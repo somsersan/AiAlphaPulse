@@ -7,3 +7,6 @@ faiss-cpu
 sentence-transformers
 python-dateutil
 orjson
+
+# PostgreSQL support
+psycopg2-binary==2.9.9

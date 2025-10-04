@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-import sqlite3
+import psycopg2
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -63,9 +63,10 @@ def _to_aware_utc(dt) -> Optional[datetime]:
 
 # ---------- Загрузка/инициализация индекса ----------
 
-def load_existing_vectors(conn: sqlite3.Connection) -> tuple[Optional[FaissIndex], int]:
-    cur = conn.execute("SELECT normalized_id, embedding, dim FROM vectors ORDER BY normalized_id")
-    rows = cur.fetchall()
+def load_existing_vectors(conn: psycopg2.extensions.connection) -> tuple[Optional[FaissIndex], int]:
+    cursor = conn.cursor()
+    cursor.execute("SELECT normalized_id, embedding, dim FROM vectors ORDER BY normalized_id")
+    rows = cursor.fetchall()
     if not rows:
         return None, 0
     dim = rows[0][2]
@@ -80,30 +81,34 @@ def load_existing_vectors(conn: sqlite3.Connection) -> tuple[Optional[FaissIndex
     return index, ids[-1]
 
 
-def fetch_new_normalized(conn: sqlite3.Connection, last_id: int) -> list[dict]:
+def fetch_new_normalized(conn: psycopg2.extensions.connection, last_id: int) -> list[dict]:
     q = """
       SELECT id, title, content, link, source, published_at, language_code
       FROM normalized_articles
-      WHERE id > ?
+      WHERE id > %s
       ORDER BY id ASC
     """
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(q, (last_id,)).fetchall()
-    return [dict(r) for r in rows]
+    cursor = conn.cursor()
+    cursor.execute(q, (last_id,))
+    rows = cursor.fetchall()
+    columns = [desc[0] for desc in cursor.description]
+    return [dict(zip(columns, row)) for row in rows]
 
 
-def get_cluster_of_doc(conn: sqlite3.Connection, normalized_id: int) -> Optional[int]:
-    row = conn.execute(
-        "SELECT cluster_id FROM cluster_members WHERE normalized_id=?",
+def get_cluster_of_doc(conn: psycopg2.extensions.connection, normalized_id: int) -> Optional[int]:
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT cluster_id FROM cluster_members WHERE normalized_id=%s",
         (normalized_id,)
-    ).fetchone()
+    )
+    row = cursor.fetchone()
     return row[0] if row else None
 
 
 # ---------- Решение о присвоении кластера ----------
 
 def decide_cluster(
-    conn: sqlite3.Connection,
+    conn: psycopg2.extensions.connection,
     neighbors: list[tuple[int, float]],
     lang: str,
     t_doc: datetime
@@ -119,10 +124,12 @@ def decide_cluster(
     window = timedelta(hours=WINDOW_HOURS)
     for nid, sim in neighbors:
         if TAU_STORY <= sim < TAU_DUP:
-            row = conn.execute(
-                "SELECT language_code, published_at FROM normalized_articles WHERE id=?",
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT language_code, published_at FROM normalized_articles WHERE id=%s",
                 (nid,)
-            ).fetchone()
+            )
+            row = cursor.fetchone()
             if not row:
                 continue
             if (row[0] or "") != (lang or ""):
@@ -141,7 +148,7 @@ def decide_cluster(
 # ---------- Операции с кластерами ----------
 
 def ensure_cluster(
-    conn: sqlite3.Connection,
+    conn: psycopg2.extensions.connection,
     headline: str,
     lang: str,
     url: str,
@@ -149,12 +156,14 @@ def ensure_cluster(
     t: datetime
 ) -> int:
     t = _to_aware_utc(t) or _now()
-    cur = conn.execute(
+    cursor = conn.cursor()
+    cursor.execute(
         """
         INSERT INTO story_clusters(
             headline, lang, first_time, last_time, domains_json, urls_json, doc_count
         )
-        VALUES(?,?,?,?,?, ?, 0)
+        VALUES(%s,%s,%s,%s,%s,%s, 0)
+        RETURNING id
         """,
         (
             headline,
@@ -166,11 +175,11 @@ def ensure_cluster(
         ),
     )
     conn.commit()
-    return cur.lastrowid
+    return cursor.fetchone()[0]
 
 
 def add_member(
-    conn: sqlite3.Connection,
+    conn: psycopg2.extensions.connection,
     cluster_id: int,
     normalized_id: int,
     url: str,
@@ -178,16 +187,18 @@ def add_member(
     t: datetime
 ):
     t = _to_aware_utc(t) or _now()
-    conn.execute(
-        "INSERT OR REPLACE INTO cluster_members(cluster_id, normalized_id, url, site, time_utc) VALUES(?,?,?,?,?)",
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO cluster_members(cluster_id, normalized_id, url, site, time_utc) VALUES(%s,%s,%s,%s,%s) ON CONFLICT (cluster_id, normalized_id) DO UPDATE SET url=EXCLUDED.url, site=EXCLUDED.site, time_utc=EXCLUDED.time_utc",
         (cluster_id, normalized_id, url, site, t.isoformat()),
     )
 
     # обновить агрегаты кластера
-    row = conn.execute(
-        "SELECT domains_json, urls_json, first_time, last_time FROM story_clusters WHERE id=?",
+    cursor.execute(
+        "SELECT domains_json, urls_json, first_time, last_time FROM story_clusters WHERE id=%s",
         (cluster_id,),
-    ).fetchone()
+    )
+    row = cursor.fetchone()
 
     domains = json.loads(row[0] or "{}")
     urls = json.loads(row[1] or "[]")
@@ -202,16 +213,16 @@ def add_member(
     if last_time is None or t > last_time:
         last_time = t
 
-    conn.execute(
+    cursor.execute(
         """
         UPDATE story_clusters
-        SET domains_json=?,
-            urls_json=?,
-            first_time=?,
-            last_time=?,
+        SET domains_json=%s,
+            urls_json=%s,
+            first_time=%s,
+            last_time=%s,
             doc_count=doc_count+1,
             updated_at=CURRENT_TIMESTAMP
-        WHERE id=?
+        WHERE id=%s
         """,
         (
             json.dumps(domains, ensure_ascii=False),
@@ -224,19 +235,21 @@ def add_member(
     conn.commit()
 
 
-def select_links_and_update(conn: sqlite3.Connection, cluster_id: int):
+def select_links_and_update(conn: psycopg2.extensions.connection, cluster_id: int):
     # earliest / strongest / latest
-    rows = conn.execute(
-        "SELECT url, site, time_utc FROM cluster_members WHERE cluster_id=? ORDER BY time_utc",
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT url, site, time_utc FROM cluster_members WHERE cluster_id=%s ORDER BY time_utc",
         (cluster_id,),
-    ).fetchall()
+    )
+    rows = cursor.fetchall()
     if not rows:
         return
     earliest = rows[0]
     latest = rows[-1]
     strongest = max(rows, key=lambda r: _source_weight(r[1]))
-    conn.execute(
-        "UPDATE story_clusters SET earliest_url=?, latest_url=?, strongest_domain=? WHERE id=?",
+    cursor.execute(
+        "UPDATE story_clusters SET earliest_url=%s, latest_url=%s, strongest_domain=%s WHERE id=%s",
         (earliest[0], latest[0], strongest[1], cluster_id),
     )
     conn.commit()
@@ -249,11 +262,13 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def recompute_scores(conn: sqlite3.Connection, cluster_id: int):
-    row = conn.execute(
-        "SELECT first_time, last_time, domains_json FROM story_clusters WHERE id=?",
+def recompute_scores(conn: psycopg2.extensions.connection, cluster_id: int):
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT first_time, last_time, domains_json FROM story_clusters WHERE id=%s",
         (cluster_id,),
-    ).fetchone()
+    )
+    row = cursor.fetchone()
     if not row:
         return
 
@@ -291,8 +306,8 @@ def recompute_scores(conn: sqlite3.Connection, cluster_id: int):
         + 0.10 * factors["materiality"]
         + 0.05 * factors["breadth"]
     )
-    conn.execute(
-        "UPDATE story_clusters SET factors_json=?, hotness=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+    cursor.execute(
+        "UPDATE story_clusters SET factors_json=%s, hotness=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s",
         (json.dumps(factors, ensure_ascii=False), hotness, cluster_id),
     )
     conn.commit()
@@ -300,12 +315,14 @@ def recompute_scores(conn: sqlite3.Connection, cluster_id: int):
 
 # ---------- Основной цикл обработки ----------
 
-def process_new_batch(conn: sqlite3.Connection, k_neighbors: int = K_NEIGHBORS):
+def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K_NEIGHBORS):
     # загрузить существующий индекс из БД (если есть)
     index, _ = load_existing_vectors(conn)
 
     # state
-    row = conn.execute("SELECT last_vectorized_id FROM dedup_state WHERE id=1").fetchone()
+    cursor = conn.cursor()
+    cursor.execute("SELECT last_vectorized_id FROM dedup_state WHERE id=1")
+    row = cursor.fetchone()
     last_vec = row[0] if row else 0
 
     new_docs = fetch_new_normalized(conn, last_vec)
@@ -333,8 +350,8 @@ def process_new_batch(conn: sqlite3.Connection, k_neighbors: int = K_NEIGHBORS):
         v = embed_text(title, content)
 
         # записать вектор в БД и добавить в индекс
-        conn.execute(
-            "INSERT OR REPLACE INTO vectors(normalized_id, embedding, model, dim) VALUES(?,?,?,?)",
+        cursor.execute(
+            "INSERT INTO vectors(normalized_id, embedding, model, dim) VALUES(%s,%s,%s,%s) ON CONFLICT (normalized_id) DO UPDATE SET embedding=EXCLUDED.embedding, model=EXCLUDED.model, dim=EXCLUDED.dim",
             (nid, v.tobytes(), MODEL_NAME, v.shape[0]),
         )
         index.add_one(v, nid)
@@ -364,7 +381,7 @@ def process_new_batch(conn: sqlite3.Connection, k_neighbors: int = K_NEIGHBORS):
         processed += 1
 
         # обновить state для инкрементальной обработки
-        conn.execute("UPDATE dedup_state SET last_vectorized_id=? WHERE id=1", (nid,))
+        cursor.execute("UPDATE dedup_state SET last_vectorized_id=%s WHERE id=1", (nid,))
         conn.commit()
 
     print(f"Обработано новых нормализованных статей: {processed}")

@@ -1,26 +1,26 @@
-"""Схема таблиц для дедупа поверх normalized_articles"""
+"""Схема таблиц для дедупа поверх normalized_articles - PostgreSQL версия"""
 from __future__ import annotations
-import sqlite3
+import psycopg2
 
 DDL = {
     "vectors": """
     CREATE TABLE IF NOT EXISTS vectors (
       normalized_id INTEGER PRIMARY KEY,
-      embedding BLOB NOT NULL,       -- np.float32.tobytes()
+      embedding BYTEA NOT NULL,       -- Бинарные данные эмбеддинга
       model TEXT NOT NULL,
       dim INTEGER NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (normalized_id) REFERENCES normalized_articles(id)
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (normalized_id) REFERENCES normalized_articles(id) ON DELETE CASCADE
     );
     """,
     "story_clusters": """
     CREATE TABLE IF NOT EXISTS story_clusters (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       headline TEXT,
       lang TEXT,
       topic TEXT,
-      first_time DATETIME,
-      last_time DATETIME,
+      first_time TIMESTAMP,
+      last_time TIMESTAMP,
       domains_json TEXT,
       urls_json TEXT,
       doc_count INTEGER DEFAULT 0,
@@ -29,8 +29,8 @@ DDL = {
       latest_url TEXT,
       factors_json TEXT,
       hotness REAL DEFAULT 0.0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """,
     "cluster_members": """
@@ -39,10 +39,10 @@ DDL = {
       normalized_id INTEGER NOT NULL,
       url TEXT,
       site TEXT,
-      time_utc DATETIME,
+      time_utc TIMESTAMP,
       PRIMARY KEY (cluster_id, normalized_id),
-      FOREIGN KEY (cluster_id) REFERENCES story_clusters(id),
-      FOREIGN KEY (normalized_id) REFERENCES normalized_articles(id)
+      FOREIGN KEY (cluster_id) REFERENCES story_clusters(id) ON DELETE CASCADE,
+      FOREIGN KEY (normalized_id) REFERENCES normalized_articles(id) ON DELETE CASCADE
     );
     """,
     "state": """
@@ -60,11 +60,12 @@ DDL = {
 }
 
 
-def init(conn: sqlite3.Connection):
+def init(conn: psycopg2.extensions.connection):
+    cursor = conn.cursor()
     for k, sql in DDL.items():
-        conn.executescript(sql)
+        cursor.execute(sql)
     # ensure state row exists
-    cur = conn.execute("SELECT COUNT(*) FROM dedup_state WHERE id=1")
-    if cur.fetchone()[0] == 0:
-        conn.execute("INSERT INTO dedup_state(id,last_vectorized_id,last_clustered_id) VALUES(1,0,0)")
+    cursor.execute("SELECT COUNT(*) FROM dedup_state WHERE id=1")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO dedup_state(id,last_vectorized_id,last_clustered_id) VALUES(1,0,0)")
     conn.commit()

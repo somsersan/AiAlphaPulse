@@ -1,8 +1,8 @@
 """
 Основной скрипт для обработки и нормализации новостных статей
+Поддержка PostgreSQL
 """
 import json
-import sqlite3
 import time
 import uuid
 from datetime import datetime
@@ -20,29 +20,28 @@ from .database_schema import (
     log_processing_batch,
     get_processing_stats
 )
+from ..database import get_db_connection, get_db_cursor
 
 
 class ArticleProcessor:
     """Класс для обработки статей"""
     
-    def __init__(self, db_path: str):
-        self.db_path = db_path
+    def __init__(self):
         self.normalizer = NewsNormalizer()
-        self.conn = None
+        self.db_conn = get_db_connection()
     
     def connect_db(self):
         """Подключение к базе данных"""
-        self.conn = sqlite3.connect(self.db_path)
-        self.conn.row_factory = sqlite3.Row
+        self.db_conn.connect()
         
         # Создание таблиц
-        create_normalized_articles_table(self.conn)
-        create_processing_log_table(self.conn)
+        create_normalized_articles_table(self.db_conn._connection)
+        create_processing_log_table(self.db_conn._connection)
     
     def close_db(self):
         """Закрытие соединения с базой"""
-        if self.conn:
-            self.conn.close()
+        if self.db_conn:
+            self.db_conn.close()
     
     def load_articles_from_json(self, json_path: str) -> List[Dict]:
         """Загрузка статей из JSON файла"""
@@ -61,26 +60,28 @@ class ArticleProcessor:
         if limit:
             query += f" LIMIT {limit}"
         
-        cursor = self.conn.execute(query)
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+        with get_db_cursor() as cursor:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
     
     def load_unprocessed_articles(self, limit: int = None) -> List[Dict]:
         """Загрузка только необработанных статей (эффективный метод)"""
-        return get_unprocessed_articles(self.conn, limit)
+        return get_unprocessed_articles(self.db_conn._connection, limit)
     
     def get_processing_status(self) -> Dict:
         """Получение статуса обработки"""
-        max_processed_id = get_max_processed_id(self.conn)
-        processed_count = len(get_processed_articles(self.conn))
+        max_processed_id = get_max_processed_id(self.db_conn._connection)
+        processed_count = len(get_processed_articles(self.db_conn._connection))
         
-        # Получаем общее количество статей
-        cursor = self.conn.execute("SELECT COUNT(*) FROM articles")
-        total_articles = cursor.fetchone()[0]
-        
-        # Получаем максимальный ID в исходной таблице
-        cursor = self.conn.execute("SELECT MAX(id) FROM articles")
-        max_original_id = cursor.fetchone()[0] or 0
+        with get_db_cursor() as cursor:
+            # Получаем общее количество статей
+            cursor.execute("SELECT COUNT(*) FROM articles")
+            total_articles = cursor.fetchone()[0]
+            
+            # Получаем максимальный ID в исходной таблице
+            cursor.execute("SELECT MAX(id) FROM articles")
+            max_original_id = cursor.fetchone()[0] or 0
         
         return {
             'max_processed_id': max_processed_id,
@@ -97,7 +98,7 @@ class ArticleProcessor:
         batch_id = str(uuid.uuid4())
         
         # Получаем уже обработанные статьи
-        processed_ids = get_processed_articles(self.conn)
+        processed_ids = get_processed_articles(self.db_conn._connection)
         
         stats = {
             'batch_id': batch_id,
@@ -123,7 +124,7 @@ class ArticleProcessor:
                 
                 if normalized_article:
                     # Сохранение в базу
-                    insert_normalized_article(self.conn, normalized_article)
+                    insert_normalized_article(self.db_conn._connection, normalized_article)
                     stats['processed_articles'] += 1
                     
                     if stats['processed_articles'] % 10 == 0:
@@ -140,7 +141,7 @@ class ArticleProcessor:
         stats['processing_time_seconds'] = round(end_time - start_time, 2)
         
         # Логирование результатов
-        log_processing_batch(self.conn, stats)
+        log_processing_batch(self.db_conn._connection, stats)
         
         print(f"\nОбработка завершена за {stats['processing_time_seconds']} секунд")
         print(f"Обработано: {stats['processed_articles']}")
@@ -220,7 +221,7 @@ class ArticleProcessor:
         """Показ статистики обработки"""
         self.connect_db()
         try:
-            stats = get_processing_stats(self.conn)
+            stats = get_processing_stats(self.db_conn._connection)
             
             print("\n=== СТАТИСТИКА ОБРАБОТКИ ===")
             print(f"Всего статей в исходной таблице: {stats['total_original_articles']}")
@@ -246,7 +247,6 @@ def main():
     
     parser = argparse.ArgumentParser(description='Обработка новостных статей')
     parser.add_argument('--json', help='Путь к JSON файлу с статьями')
-    parser.add_argument('--db', help='Путь к базе данных', default='data/rss_articles.db')
     parser.add_argument('--limit', type=int, help='Лимит статей для обработки')
     parser.add_argument('--batch-size', type=int, default=100, help='Размер пакета')
     parser.add_argument('--stats', action='store_true', help='Показать статистику')
@@ -255,7 +255,7 @@ def main():
     
     args = parser.parse_args()
     
-    processor = ArticleProcessor(args.db)
+    processor = ArticleProcessor()
     
     if args.stats:
         processor.show_stats()

@@ -215,7 +215,7 @@ python -m scripts.export_topk --db data/rss_articles.db --out radar_top.json --t
 - `beautifulsoup4` - очистка HTML
 - `langdetect` - определение языка
 - `nltk` - обработка текста
-- `sqlite3` - база данных
+- `psycopg2-binary` - подключение к PostgreSQL
 
 ### Производительность
 - Обработка ~100 статей за 0.4 секунды

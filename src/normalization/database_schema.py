@@ -1,35 +1,37 @@
 """
 Схема базы данных для нормализованных новостей
+Поддержка PostgreSQL
 """
-import sqlite3
+import psycopg2
 from datetime import datetime
 from typing import List, Dict
 
 
-def create_normalized_articles_table(conn: sqlite3.Connection):
+def create_normalized_articles_table(conn: psycopg2.extensions.connection):
     """Создание таблицы для нормализованных статей"""
     
     create_table_sql = """
     CREATE TABLE IF NOT EXISTS normalized_articles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         original_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
         link TEXT,
         source TEXT,
-        published_at DATETIME,
+        published_at TIMESTAMP,
         language_code TEXT,
         entities_json TEXT,  -- JSON строка со списком сущностей
         quality_score REAL,
         word_count INTEGER,
-        is_processed BOOLEAN DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (original_id) REFERENCES articles (id)
+        is_processed BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (original_id) REFERENCES articles (id) ON DELETE CASCADE
     );
     """
     
-    conn.execute(create_table_sql)
+    cursor = conn.cursor()
+    cursor.execute(create_table_sql)
     
     # Создание индексов для оптимизации запросов
     indexes = [
@@ -41,76 +43,82 @@ def create_normalized_articles_table(conn: sqlite3.Connection):
     ]
     
     for index_sql in indexes:
-        conn.execute(index_sql)
+        cursor.execute(index_sql)
     
     conn.commit()
 
 
-def create_processing_log_table(conn: sqlite3.Connection):
+def create_processing_log_table(conn: psycopg2.extensions.connection):
     """Создание таблицы для логов обработки"""
     
     create_table_sql = """
     CREATE TABLE IF NOT EXISTS processing_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         batch_id TEXT NOT NULL,
         total_articles INTEGER,
         processed_articles INTEGER,
         filtered_articles INTEGER,
         error_count INTEGER,
         processing_time_seconds REAL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """
     
-    conn.execute(create_table_sql)
+    cursor = conn.cursor()
+    cursor.execute(create_table_sql)
     conn.commit()
 
 
-def get_processed_articles(conn: sqlite3.Connection) -> set:
+def get_processed_articles(conn: psycopg2.extensions.connection) -> set:
     """Получение списка уже обработанных статей"""
-    cursor = conn.execute("SELECT original_id FROM normalized_articles")
+    cursor = conn.cursor()
+    cursor.execute("SELECT original_id FROM normalized_articles")
     return {row[0] for row in cursor.fetchall()}
 
 
-def get_max_processed_id(conn: sqlite3.Connection) -> int:
+def get_max_processed_id(conn: psycopg2.extensions.connection) -> int:
     """Получение максимального ID уже обработанных статей"""
-    cursor = conn.execute("SELECT MAX(original_id) FROM normalized_articles")
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(original_id) FROM normalized_articles")
     result = cursor.fetchone()[0]
     return result if result is not None else 0
 
 
-def get_unprocessed_articles(conn: sqlite3.Connection, limit: int = None) -> List[Dict]:
+def get_unprocessed_articles(conn: psycopg2.extensions.connection, limit: int = None) -> List[Dict]:
     """Получение необработанных статей (ID больше максимального обработанного)"""
     max_id = get_max_processed_id(conn)
     
     query = """
     SELECT id, title, link, source, published, is_processed, summary, content
     FROM articles
-    WHERE id > ?
+    WHERE id > %s
     ORDER BY id ASC
     """
     
     if limit:
         query += f" LIMIT {limit}"
     
-    cursor = conn.execute(query, (max_id,))
+    cursor = conn.cursor()
+    cursor.execute(query, (max_id,))
     rows = cursor.fetchall()
     return [dict(row) for row in rows]
 
 
-def insert_normalized_article(conn: sqlite3.Connection, article: dict) -> int:
+def insert_normalized_article(conn: psycopg2.extensions.connection, article: dict) -> int:
     """Вставка нормализованной статьи в базу"""
     
     insert_sql = """
     INSERT INTO normalized_articles 
     (original_id, title, content, link, source, published_at, language_code, 
      entities_json, quality_score, word_count, is_processed)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    RETURNING id
     """
     
     import json
     
-    cursor = conn.execute(insert_sql, (
+    cursor = conn.cursor()
+    cursor.execute(insert_sql, (
         article['original_id'],
         article['title'],
         article['content'],
@@ -125,20 +133,21 @@ def insert_normalized_article(conn: sqlite3.Connection, article: dict) -> int:
     ))
     
     conn.commit()
-    return cursor.lastrowid
+    return cursor.fetchone()[0]
 
 
-def log_processing_batch(conn: sqlite3.Connection, batch_info: dict):
+def log_processing_batch(conn: psycopg2.extensions.connection, batch_info: dict):
     """Логирование информации о пакетной обработке"""
     
     insert_sql = """
     INSERT INTO processing_log 
     (batch_id, total_articles, processed_articles, filtered_articles, 
      error_count, processing_time_seconds)
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (%s, %s, %s, %s, %s, %s)
     """
     
-    conn.execute(insert_sql, (
+    cursor = conn.cursor()
+    cursor.execute(insert_sql, (
         batch_info['batch_id'],
         batch_info['total_articles'],
         batch_info['processed_articles'],
@@ -150,21 +159,22 @@ def log_processing_batch(conn: sqlite3.Connection, batch_info: dict):
     conn.commit()
 
 
-def get_processing_stats(conn: sqlite3.Connection) -> dict:
+def get_processing_stats(conn: psycopg2.extensions.connection) -> dict:
     """Получение статистики обработки"""
     
     stats = {}
+    cursor = conn.cursor()
     
     # Общее количество статей в исходной таблице
-    cursor = conn.execute("SELECT COUNT(*) FROM articles")
+    cursor.execute("SELECT COUNT(*) FROM articles")
     stats['total_original_articles'] = cursor.fetchone()[0]
     
     # Количество обработанных статей
-    cursor = conn.execute("SELECT COUNT(*) FROM normalized_articles")
+    cursor.execute("SELECT COUNT(*) FROM normalized_articles")
     stats['total_processed_articles'] = cursor.fetchone()[0]
     
     # Статистика по языкам
-    cursor = conn.execute("""
+    cursor.execute("""
         SELECT language_code, COUNT(*) 
         FROM normalized_articles 
         GROUP BY language_code 
@@ -173,12 +183,12 @@ def get_processing_stats(conn: sqlite3.Connection) -> dict:
     stats['language_distribution'] = dict(cursor.fetchall())
     
     # Средний балл качества
-    cursor = conn.execute("SELECT AVG(quality_score) FROM normalized_articles")
+    cursor.execute("SELECT AVG(quality_score) FROM normalized_articles")
     avg_quality = cursor.fetchone()[0]
     stats['average_quality_score'] = round(avg_quality, 3) if avg_quality else 0
     
     # Статистика по источникам
-    cursor = conn.execute("""
+    cursor.execute("""
         SELECT source, COUNT(*) 
         FROM normalized_articles 
         GROUP BY source 

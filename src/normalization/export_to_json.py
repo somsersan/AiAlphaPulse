@@ -1,18 +1,23 @@
 """
 Скрипт для экспорта нормализованных данных в JSON
+Поддержка PostgreSQL
 """
 import json
-import sqlite3
 import argparse
 from datetime import datetime
 from pathlib import Path
+import sys
+
+# Добавляем src в путь
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from src.database import get_db_connection, get_db_cursor
 
 
-def export_normalized_to_json(db_path: str, output_path: str, limit: int = None, min_quality: float = 0.0, language: str = None):
+def export_normalized_to_json(output_path: str, limit: int = None, min_quality: float = 0.0, language: str = None):
     """Экспорт нормализованных статей в JSON"""
     
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    db_conn = get_db_connection()
+    db_conn.connect()
     
     # Формируем запрос
     query = """
@@ -29,23 +34,24 @@ def export_normalized_to_json(db_path: str, output_path: str, limit: int = None,
         word_count,
         created_at
     FROM normalized_articles
-    WHERE quality_score >= ?
+    WHERE quality_score >= %s
     """
     
     params = [min_quality]
     
     if language:
-        query += " AND language_code = ?"
+        query += " AND language_code = %s"
         params.append(language)
     
     query += " ORDER BY quality_score DESC, published_at DESC"
     
     if limit:
-        query += " LIMIT ?"
+        query += " LIMIT %s"
         params.append(limit)
     
-    cursor = conn.execute(query, params)
-    rows = cursor.fetchall()
+    with get_db_cursor() as cursor:
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
     
     # Конвертация в список словарей
     articles = []
@@ -71,7 +77,7 @@ def export_normalized_to_json(db_path: str, output_path: str, limit: int = None,
             'min_quality_filter': min_quality,
             'language_filter': language,
             'limit_applied': limit,
-            'database_path': db_path
+            'database': 'PostgreSQL'
         },
         'articles': articles
     }
@@ -80,7 +86,7 @@ def export_normalized_to_json(db_path: str, output_path: str, limit: int = None,
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(export_data, f, ensure_ascii=False, indent=2, default=str)
     
-    conn.close()
+    db_conn.close()
     
     print(f"✅ Экспортировано {len(articles)} статей в {output_path}")
     print(f"📊 Метаданные:")
@@ -92,25 +98,24 @@ def export_normalized_to_json(db_path: str, output_path: str, limit: int = None,
     return len(articles)
 
 
-def export_all_articles(db_path: str, output_path: str):
+def export_all_articles(output_path: str):
     """Экспорт всех нормализованных статей"""
-    return export_normalized_to_json(db_path, output_path)
+    return export_normalized_to_json(output_path)
 
 
-def export_high_quality_articles(db_path: str, output_path: str, min_quality: float = 0.8):
+def export_high_quality_articles(output_path: str, min_quality: float = 0.8):
     """Экспорт только высококачественных статей"""
-    return export_normalized_to_json(db_path, output_path, min_quality=min_quality)
+    return export_normalized_to_json(output_path, min_quality=min_quality)
 
 
-def export_by_language(db_path: str, output_path: str, language: str, limit: int = None):
+def export_by_language(output_path: str, language: str, limit: int = None):
     """Экспорт статей по языку"""
-    return export_normalized_to_json(db_path, output_path, language=language, limit=limit)
+    return export_normalized_to_json(output_path, language=language, limit=limit)
 
 
 def main():
     """Главная функция"""
     parser = argparse.ArgumentParser(description='Экспорт нормализованных статей в JSON')
-    parser.add_argument('--db', default='data/rss_articles.db', help='Путь к базе данных')
     parser.add_argument('--output', default='normalized_articles.json', help='Путь к выходному файлу')
     parser.add_argument('--limit', type=int, help='Лимит статей для экспорта')
     parser.add_argument('--min-quality', type=float, default=0.0, help='Минимальный балл качества')
@@ -135,7 +140,6 @@ def main():
     
     try:
         count = export_normalized_to_json(
-            args.db, 
             args.output, 
             args.limit, 
             args.min_quality, 
