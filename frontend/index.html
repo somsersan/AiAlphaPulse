@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI ALPHA PULSE - Лента обновлений</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+      <div class="nav-container">
+        <img src="./logo.jpg" alt="Logo" class="logo">
+        <h1 class="logo-text">AI ALPHA PULSE</h1>
+
+        <div class="nav-spacer"></div> <!-- пустой блок для выравнивания -->
+
+        <button id="filterToggle" class="filter-btn">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+            <polygon points="22,3 2,3 10,12.5 10,19 14,21 14,12.5 22,3"></polygon>
+          </svg>
+          Фильтр
+        </button>
+      </div>
+    </nav>
+
+</nav>
+
+<div id="filterOverlay" class="overlay hidden">
+    <div class="filter-modal">
+        <h3>Фильтрация по дате</h3>
+        <label>
+            Начало периода
+            <input type="date" id="startDatePopup">
+        </label>
+        <label>
+            Конец периода
+            <input type="date" id="endDatePopup">
+        </label>
+        <div class="modal-actions">
+            <button id="applyFilter" class="apply-btn">Применить</button>
+            <button id="closeFilter" class="close-btn">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+
+    <div class="container">
+        <div class="header">
+            <h2 class="fancy-title">Новости финансового мира</h2>
+
+        <div style="display:none;">
+            <input type="date" id="startDate">
+            <input type="date" id="endDate">
+            <div id="resetButton"></div>
+            Найдено новостей: <span id="postCount"></span>
+            Страница <span id="currentPage"></span> из <span id="totalPages"></span>
+        </div>
+
+        <div id="postsContainer" class="posts-container">
+        </div>
+
+        <div id="pagination" class="pagination hidden">
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
