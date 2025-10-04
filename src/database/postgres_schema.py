@@ -7,43 +7,13 @@ from typing import List, Dict
 
 
 def create_articles_table(conn: psycopg2.extensions.connection):
-    """Создание таблицы articles (исходные статьи)"""
-    
-    create_table_sql = """
-    CREATE TABLE IF NOT EXISTS articles (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR NOT NULL,
-        link VARCHAR NOT NULL,
-        published TIMESTAMP,
-        summary TEXT,
-        source VARCHAR,
-        feed_url VARCHAR,
-        content TEXT,
-        author VARCHAR,
-        category VARCHAR,
-        image_url VARCHAR,
-        word_count INTEGER,
-        reading_time INTEGER,
-        is_processed BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(title, link)
-    );
     """
-    
-    conn.cursor().execute(create_table_sql)
-    
-    # Создание индексов
-    indexes = [
-        "CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published);",
-        "CREATE INDEX IF NOT EXISTS idx_articles_source ON articles(source);",
-        "CREATE INDEX IF NOT EXISTS idx_articles_created_at ON articles(created_at);",
-        "CREATE INDEX IF NOT EXISTS idx_articles_is_processed ON articles(is_processed);"
-    ]
-    
-    for index_sql in indexes:
-        conn.cursor().execute(index_sql)
-    
-    conn.commit()
+    ПРИМЕЧАНИЕ: Таблица articles заменена на financial_news_view
+    financial_news_view создаётся внешним парсером
+    Эта функция оставлена для обратной совместимости и ничего не делает
+    """
+    # View создаётся в парсере, здесь ничего не делаем
+    print("ℹ️  Таблица articles заменена на financial_news_view (создаётся парсером)")
 
 
 def create_normalized_articles_table(conn: psycopg2.extensions.connection):
@@ -64,8 +34,8 @@ def create_normalized_articles_table(conn: psycopg2.extensions.connection):
         word_count INTEGER,
         is_processed BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (original_id) REFERENCES articles (id) ON DELETE CASCADE
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        -- ПРИМЕЧАНИЕ: FK на financial_news_view убран, т.к. это view, а не таблица
     );
     """
     

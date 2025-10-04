@@ -81,13 +81,16 @@ def load_existing_vectors(conn: psycopg2.extensions.connection) -> tuple[Optiona
     return index, ids[-1]
 
 
-def fetch_new_normalized(conn: psycopg2.extensions.connection, last_id: int) -> list[dict]:
+def fetch_new_normalized(conn: psycopg2.extensions.connection, last_id: int, limit: int = None) -> list[dict]:
     q = """
       SELECT id, title, content, link, source, published_at, language_code
       FROM normalized_articles
       WHERE id > %s
       ORDER BY id ASC
     """
+    if limit:
+        q += f" LIMIT {limit}"
+    
     cursor = conn.cursor()
     cursor.execute(q, (last_id,))
     rows = cursor.fetchall()
@@ -315,7 +318,7 @@ def recompute_scores(conn: psycopg2.extensions.connection, cluster_id: int):
 
 # ---------- Основной цикл обработки ----------
 
-def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K_NEIGHBORS):
+def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K_NEIGHBORS, max_docs: int = None):
     # загрузить существующий индекс из БД (если есть)
     index, _ = load_existing_vectors(conn)
 
@@ -325,10 +328,12 @@ def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K
     row = cursor.fetchone()
     last_vec = row[0] if row else 0
 
-    new_docs = fetch_new_normalized(conn, last_vec)
+    new_docs = fetch_new_normalized(conn, last_vec, limit=max_docs)
     if not new_docs:
         print("Нет новых нормализованных статей")
         return 0
+    
+    print(f"📊 Найдено новых статей: {len(new_docs)}")
 
     if index is None:
         # ленивая инициализация индекса при первом векторе

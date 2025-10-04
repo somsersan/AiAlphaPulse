@@ -1,4 +1,4 @@
-# Используем официальный Python образ
+# Dockerfile для пайплайна обработки новостей
 FROM python:3.11-slim
 
 # Устанавливаем рабочую директорию
@@ -7,7 +7,9 @@ WORKDIR /app
 # Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
     gcc \
+    g++ \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем файл зависимостей
@@ -16,16 +18,18 @@ COPY requirements.txt .
 # Устанавливаем Python зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Скачиваем NLTK данные
+RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
+
 # Копируем исходный код
 COPY . .
 
 # Создаем пользователя для безопасности
 RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app
+
 USER app
 
-# Открываем порт
-EXPOSE 8000
+# Точка входа по умолчанию
+CMD ["python", "-u", "pipeline_worker.py"]
 
-# Команда запуска
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

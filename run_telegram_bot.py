@@ -71,10 +71,16 @@ def main():
             print("Команды:")
             print("  /start - начало работы")
             print("  /top [N] [hours] - топ новостей")
+            print("  /latest [N] - последние новости")
+            print("  /subscribe - подписаться на уведомления")
             print("  /help - справка")
             print("="*60)
             
-            bot = NewsBot()
+            bot = NewsBot(
+                enable_monitor=True,
+                hotness_threshold=args.threshold,
+                check_interval=args.interval
+            )
             bot.run()
             
     except ValueError as e:

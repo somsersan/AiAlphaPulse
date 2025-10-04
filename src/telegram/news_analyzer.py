@@ -9,7 +9,11 @@ class NewsAnalyzer:
     """Генерирует детальную аналитику по новости"""
     
     def __init__(self, api_key: str = None, model: str = None):
-        self.llm_client = OpenRouterClient(api_key=api_key, model=model or os.getenv("LLM_MODEL", "deepseek/deepseek-chat"))
+        # Для детального анализа используем более мощную модель
+        # LLM_ANALYSIS_MODEL - для детального анализа (по умолчанию Claude 3.5 Sonnet)
+        # LLM_MODEL - для быстрой оценки hotness
+        self.analysis_model = model or os.getenv("LLM_ANALYSIS_MODEL", "anthropic/claude-3.5-sonnet")
+        self.llm_client = OpenRouterClient(api_key=api_key, model=self.analysis_model)
     
     def generate_full_analysis(self, news: Dict) -> Dict:
         """
@@ -43,10 +47,10 @@ class NewsAnalyzer:
         }
         
         payload = {
-            "model": self.llm_client.model,
+            "model": self.analysis_model,  # Используем мощную модель
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.4,
-            "max_tokens": 800
+            "temperature": 0.3,  # Более низкая температура для точного анализа
+            "max_tokens": 1500  # Больше токенов для детального анализа
         }
         
         try:
@@ -96,10 +100,19 @@ class NewsAnalyzer:
 
             content = _sanitize(content)
 
+            # Проверяем, что после всех обработок остался валидный контент
+            if not content or not content.strip():
+                print(f"⚠️ Ошибка генерации анализа: пустой ответ от LLM")
+                return self._get_fallback_analysis(hotness)
+
             # Парсим JSON, разрешая неэкранированные управляющие символы внутри строк
-            analysis = json.loads((content or "").strip(), strict=False)
+            analysis = json.loads(content.strip(), strict=False)
             return analysis
             
+        except json.JSONDecodeError as e:
+            print(f"⚠️ Ошибка генерации анализа: невалидный JSON - {e}")
+            print(f"Полученный ответ: {content if 'content' in locals() else 'N/A'}")
+            return self._get_fallback_analysis(hotness)
         except Exception as e:
             print(f"⚠️ Ошибка генерации анализа: {e}")
             return self._get_fallback_analysis(hotness)

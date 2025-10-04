@@ -5,12 +5,17 @@
 import json
 import time
 import uuid
+import sys
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
 
-from .normalizer import NewsNormalizer
-from .database_schema import (
+# Добавляем корневую директорию проекта в путь
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from src.normalization.normalizer import NewsNormalizer
+from src.normalization.database_schema import (
     create_normalized_articles_table,
     create_processing_log_table,
     get_processed_articles,
@@ -20,7 +25,7 @@ from .database_schema import (
     log_processing_batch,
     get_processing_stats
 )
-from ..database import get_db_connection, get_db_cursor
+from src.database import get_db_connection, get_db_cursor
 
 
 class ArticleProcessor:
@@ -53,7 +58,7 @@ class ArticleProcessor:
         """Загрузка статей из базы данных"""
         query = """
         SELECT id, title, link, source, published, is_processed, summary, content
-        FROM articles
+        FROM financial_news_view
         ORDER BY published DESC
         """
         
@@ -76,11 +81,11 @@ class ArticleProcessor:
         
         with get_db_cursor() as cursor:
             # Получаем общее количество статей
-            cursor.execute("SELECT COUNT(*) FROM articles")
+            cursor.execute("SELECT COUNT(*) FROM financial_news_view")
             total_articles = cursor.fetchone()['count']
             
             # Получаем максимальный ID в исходной таблице
-            cursor.execute("SELECT MAX(id) FROM articles")
+            cursor.execute("SELECT MAX(id) FROM financial_news_view")
             max_original_id = cursor.fetchone()['max'] or 0
         
         return {

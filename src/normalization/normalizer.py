@@ -110,8 +110,8 @@ class NewsNormalizer:
         
         text_lower = text.lower()
         
-        # Проверка длины
-        if len(text.strip()) < 50:
+        # Проверка длины (ослаблена с 50 до 20)
+        if len(text.strip()) < 20:
             return True
         
         # Проверка спам-паттернов
@@ -167,8 +167,8 @@ class NewsNormalizer:
         """Расчет качества статьи (0-1)"""
         score = 0.0
         
-        # Проверка наличия контента
-        if not article.get('content') or len(article['content'].strip()) < 100:
+        # Проверка наличия контента (ослаблена с 100 до 30)
+        if not article.get('content') or len(article['content'].strip()) < 30:
             return 0.0
         
         # Длина контента
@@ -215,7 +215,7 @@ class NewsNormalizer:
                 normalized_title = fixed_title
                 # можно слегка наказать quality_score позже, например -0.05
         
-        if not normalized_content or len(normalized_content.strip()) < 50:
+        if not normalized_content or len(normalized_content.strip()) < 30:
             return None
         
         # Определение языка
@@ -227,7 +227,7 @@ class NewsNormalizer:
         # Расчет качества
         quality_score = self.calculate_quality_score(article)
         
-        if quality_score < 0.3:  # Минимальный порог качества
+        if quality_score < 0.2:  # Минимальный порог качества (ослаблен с 0.3 до 0.2)
             return None
         
         # Создание нормализованной записи

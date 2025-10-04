@@ -25,8 +25,7 @@ def create_normalized_articles_table(conn: psycopg2.extensions.connection):
         word_count INTEGER,
         is_processed BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (original_id) REFERENCES articles (id) ON DELETE CASCADE
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """
     
@@ -90,7 +89,7 @@ def get_unprocessed_articles(conn: psycopg2.extensions.connection, limit: int = 
     
     query = """
     SELECT id, title, link, source, published, is_processed, summary, content
-    FROM articles
+    FROM financial_news_view
     WHERE id > %s
     ORDER BY id ASC
     """
@@ -166,7 +165,7 @@ def get_processing_stats(conn: psycopg2.extensions.connection) -> dict:
     cursor = conn.cursor()
     
     # Общее количество статей в исходной таблице
-    cursor.execute("SELECT COUNT(*) FROM articles")
+    cursor.execute("SELECT COUNT(*) FROM financial_news_view")
     stats['total_original_articles'] = cursor.fetchone()[0]
     
     # Количество обработанных статей
