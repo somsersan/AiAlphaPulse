@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Alpha Pulse</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Базовые стили */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #111111, #050505);
+      color: #f0f0f0;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* Navbar */
+    nav {
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(10px);
+      background: rgba(20, 20, 20, 0.85);
+      border-bottom: 1px solid #333;
+      z-index: 50;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .nav-container h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #a855f7, #ec4899, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-container img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+    }
+
+    /* Контейнер */
+    .container {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      transform: translateY(-20px);
+      animation: fadeIn 0.6s forwards;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Карточка фильтра */
+    .card {
+      background: rgba(40, 40, 40, 0.5);
+      border: 1px solid #333;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(5px);
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+      color: #aaa;
+    }
+
+    input[type="date"] {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid #555;
+      background: rgba(50, 50, 50, 0.7);
+      color: #f0f0f0;
+    }
+
+    input[type="date"]:focus {
+      border-color: #a855f7;
+      outline: none;
+      box-shadow: 0 0 6px rgba(168, 85, 247, 0.5);
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      border: none;
+      background: transparent;
+      color: #a855f7;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    button:hover {
+      background: rgba(168, 85, 247, 0.1);
+      color: #ec4899;
+    }
+
+    .info {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 0.5rem;
+    }
+
+    /* Лента новостей */
+    .post {
+      background: rgba(30, 30, 30, 0.5);
+      border: 1px solid #333;
+      border-radius: 1rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      transition: transform 0.3s, opacity 0.3s;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeInPosts 0.5s forwards;
+    }
+
+    .post h4 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .post p {
+      font-size: 0.9rem;
+      color: #ccc;
+      margin-bottom: 0.5rem;
+    }
+
+    .post a {
+      font-size: 0.85rem;
+      color: #a855f7;
+      text-decoration: underline;
+    }
+
+    @keyframes fadeInPosts {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Кнопки пагинации */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .pagination button {
+      background: rgba(50, 50, 50, 0.7);
+      color: #f0f0f0;
+    }
+
+    .pagination button.active {
+      background: #a855f7;
+      color: #fff;
+    }
+
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-container">
+      <img src="https://github.com/user-attachments/assets/da863210-c90e-4a34-b6d3-c9ec2b5d7e13" alt="Logo">
+      <h1>AI ALPHA PULSE</h1>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h2>Лента обновлений</h2>
+
+    <!-- Фильтр -->
+    <div class="card">
+      <h3>Фильтрация по дате</h3>
+      <div class="filters">
+        <div>
+          <label>Начало периода</label>
+          <input type="date" id="startDate">
+        </div>
+        <div>
+          <label>Конец периода</label>
+          <input type="date" id="endDate">
+        </div>
+      </div>
+      <button id="resetFilters">Сбросить фильтры</button>
+      <div class="info" id="infoText"></div>
+    </div>
+
+    <!-- Лента постов -->
+    <div id="postsContainer"></div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <script>
+    const allPosts = [
+      { id: 1, title: "Новый релиз AI-инструмента", excerpt: "Компания представила инновационную платформу...", date: "2025-10-04", source: "https://example.com/post1" },
+      { id: 2, title: "Прорыв в квантовых вычислениях", excerpt: "Исследователи сделали шаг к практическому применению...", date: "2025-10-03", source: "https://example.com/post2" },
+      { id: 3, title: "Минимализм как философия дизайна", excerpt: "Почему ведущие компании выбирают лаконичные интерфейсы...", date: "2025-10-01", source: "https://example.com/post3" },
+      { id: 4, title: "Новая эра машинного обучения", excerpt: "Технологии ML достигли нового уровня точности...", date: "2025-09-28", source: "https://example.com/post4" },
+      { id: 5, title: "Будущее веб-разработки", excerpt: "Обзор трендов и инструментов 2025 года...", date: "2025-09-25", source: "https://example.com/post5" }
+    ];
+
+    const postsContainer = document.getElementById('postsContainer');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const resetBtn = document.getElementById('resetFilters');
+    const infoText = document.getElementById('infoText');
+    const pagination = document.getElementById('pagination');
+
+    let currentPage = 1;
+    const postsPerPage = 50;
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+    }
+
+    function filterPosts() {
+      const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
+      const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
+
+      return allPosts.filter(post => {
+        const postDate = new Date(post.date);
+        if (startDate && endDate) return postDate >= startDate && postDate <= endDate;
+        if (startDate) return postDate >= startDate;
+        if (endDate) return postDate <= endDate;
+        return true;
+      }).sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    function renderPosts() {
+      const filtered = filterPosts();
+      const totalPages = Math.ceil(filtered.length / postsPerPage);
+      if(currentPage > totalPages) currentPage = 1;
+      const start = (currentPage - 1) * postsPerPage;
+      const end = currentPage * postsPerPage;
+      const currentPosts = filtered.slice(start, end);
+
+      postsContainer.innerHTML = '';
+      currentPosts.forEach(post => {
+        const div = document.createElement('div');
+        div.className = 'post';
+        div.innerHTML = `
+          <h4>${post.title}</h4>
+          <p>${post.excerpt}</p>
+          <p>${formatDate(post.date)}</p>
+          <a href="${post.source}" target="_blank">Читать далее</a>
+        `;
+        postsContainer.appendChild(div);
+      });
+
+      infoText.textContent = `Найдено новостей: ${filtered.length} | Страница ${currentPage} из ${totalPages}`;
+      renderPagination(totalPages);
+    }
+
+    function renderPagination(totalPages) {
+      pagination.innerHTML = '';
+      for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        if (i === currentPage) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          currentPage = i;
+          renderPosts();
+        });
+        pagination.appendChild(btn);
+      }
+    }
+
+    startDateInput.addEventListener('change', () => { currentPage = 1; renderPosts(); });
+    endDateInput.addEventListener('change', () => { currentPage = 1; renderPosts(); });
+    resetBtn.addEventListener('click', () => {
+      startDateInput.value = '';
+      endDateInput.value = '';
+      currentPage = 1;
+      renderPosts();
+    });
+
+    renderPosts();
+  </script>
+
+</body>
+</html>
