@@ -8,6 +8,10 @@ from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Dict
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean
+from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
+import os
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,6 +19,35 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("parser")
+
+# PostgreSQL настройки
+load_dotenv()
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://rss_user:rss_password@localhost:5432/rss_db')
+
+# Определение модели БД (SQLAlchemy)
+Base = declarative_base()
+
+class Article(Base):
+    __tablename__ = 'articles'
+    
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False, unique=True)
+    link = Column(String, nullable=False)
+    published = Column(DateTime)
+    summary = Column(Text)
+    source = Column(String)
+    feed_url = Column(String)
+    content = Column(Text)  # Полный текст статьи
+    author = Column(String)  # Автор статьи
+    category = Column(String)  # Категория/теги
+    image_url = Column(String)  # URL изображения
+    word_count = Column(Integer)  # Количество слов
+    reading_time = Column(Integer)  # Время чтения в минутах
+    is_processed = Column(Boolean, default=False)  # Обработана ли статья
+    created_at = Column(DateTime, default=datetime.now)  # Когда добавлена в БД
+
+    def __repr__(self):
+        return f"<Article(title='{self.title[:30]}...', source='{self.source}')>"
 
 CHANNELS = [
     'RBCNews', 'vedomosti', 'kommersant', 'tass_agency', 'interfaxonline',
@@ -32,7 +65,7 @@ CHANNELS = [
     'beststocks_usadividends', 'if_stocks', 'realvisiontv',
     'spydell_finance', 'WallStreetBets', 'SatoshiCalls', 'Hypercharts',
 
-    'MinorityMindset', 'BiggerPockets', 'RyanScribner',
+    'BiggerPockets', 'RyanScribner',
     'JeffRose', 'MarkoWhiteBoardFinance',
     'DevinCarroll', 'BenHedges'
 ]
@@ -206,6 +239,95 @@ def print_stats(posts: List[Post]):
     print("\n📺 По каналам:")
     for c, n in sorted(chans.items(), key=lambda x: x[1], reverse=True):
         print(f"  {c}: {n}")
+
+def setup_database():
+    """Настраивает соединение с БД и создает таблицы, если их нет."""
+    engine = create_engine(DATABASE_URL)
+    Base.metadata.create_all(engine) 
+    Session = sessionmaker(bind=engine)
+    return Session()
+
+def calculate_reading_stats(content):
+    """Вычисляет статистику чтения."""
+    if not content:
+        return 0, 0
+    
+    # Подсчет слов (простая логика)
+    words = re.findall(r'\b\w+\b', content.lower())
+    word_count = len(words)
+    
+    # Время чтения (примерно 200 слов в минуту)
+    reading_time = max(1, word_count // 200)
+    
+    return word_count, reading_time
+
+async def parse_and_save_telegram():
+    """Парсит Telegram каналы и сохраняет новые посты в БД."""
+    session = setup_database()
+    global_new_count = 0
+    
+    log.info(f"🛠️ Начинаем парсинг {len(CHANNELS)} Telegram каналов...")
+    
+    parser = TelegramParser()
+    try:
+        posts = await parser.parse_all(CHANNELS, limit=20)
+        
+        for post in posts:
+            try:
+                # Проверяем, существует ли статья
+                exists = session.query(Article).filter_by(title=post.text[:255]).first()
+                if exists:
+                    continue
+                
+                log.info(f"📄 Обрабатываем пост: {post.text[:50]}...")
+                
+                # Парсим дату
+                pub_date = None
+                try:
+                    pub_date = datetime.fromisoformat(post.date.replace('Z', '+00:00'))
+                except:
+                    pub_date = datetime.now()
+                
+                # Вычисляем статистику
+                word_count, reading_time = calculate_reading_stats(post.text)
+                
+                # Создаем статью
+                new_article = Article(
+                    title=post.text[:255],  # Ограничиваем длину заголовка
+                    link=post.url,
+                    published=pub_date,
+                    summary=post.text[:500],  # Первые 500 символов как summary
+                    source=post.channel,
+                    feed_url=f"https://t.me/{post.channel[1:]}",  # Убираем @
+                    content=post.text,
+                    author=None,  # В Telegram постах обычно нет автора
+                    category=", ".join(post.categories),
+                    image_url=None,  # Пока не извлекаем изображения
+                    word_count=word_count,
+                    reading_time=reading_time,
+                    is_processed=True
+                )
+                
+                session.add(new_article)
+                global_new_count += 1
+                
+                log.info(f"✅ Пост добавлен (слов: {word_count}, время чтения: {reading_time} мин)")
+                
+            except Exception as e:
+                log.error(f"❌ Ошибка при обработке поста: {e}")
+                continue
+        
+        session.commit()
+        log.info(f"✅ Telegram парсинг завершен. Добавлено новых записей: {global_new_count}")
+        return global_new_count
+        
+    except Exception as e:
+        session.rollback()
+        log.error(f"❌ Критическая ошибка при парсинге Telegram: {e}")
+        return 0
+    finally:
+        session.close()
+        await parser.close()
 
 async def main():
     log.info(" Старт парсинга...")

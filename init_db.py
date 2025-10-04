@@ -37,7 +37,7 @@ def init_database():
         sys.exit(1)
     
     try:
-        from rss_parser_postgres import setup_database
+        from rss_parser import setup_database
         session = setup_database()
         print("✅ База данных инициализирована успешно")
         session.close()

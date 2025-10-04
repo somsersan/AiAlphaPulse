@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 import uvicorn
 from rss_parser import parse_and_save_rss, check_articles, get_articles_stats, setup_database
+from telegram_parser import parse_and_save_telegram
 
 # Lifespan event handler
 @asynccontextmanager
@@ -35,8 +36,8 @@ async def lifespan(app: FastAPI):
 
 # Создаем FastAPI приложение
 app = FastAPI(
-    title="RSS Parser API",
-    description="API для парсинга RSS-лент с автоматическим обновлением каждую минуту",
+    title="RSS & Telegram Parser API",
+    description="API для парсинга RSS-лент и Telegram каналов с автоматическим обновлением каждую минуту",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -95,12 +96,20 @@ def auto_parse_worker():
             print(f"🔄 Автоматический парсинг запущен в {datetime.now()}")
             parsing_status["is_running"] = True
             
-            new_count = parse_and_save_rss()
+            # Парсинг RSS
+            rss_count = parse_and_save_rss()
+            print(f"✅ RSS парсинг завершен. Добавлено статей: {rss_count}")
+            
+            # Парсинг Telegram
+            telegram_count = asyncio.run(parse_and_save_telegram())
+            print(f"✅ Telegram парсинг завершен. Добавлено постов: {telegram_count}")
+            
+            total_count = rss_count + telegram_count
             parsing_status["last_run"] = datetime.now()
-            parsing_status["last_articles_count"] = new_count
+            parsing_status["last_articles_count"] = total_count
             parsing_status["is_running"] = False
             
-            print(f"✅ Автоматический парсинг завершен. Добавлено статей: {new_count}")
+            print(f"✅ Общий парсинг завершен. Всего добавлено: {total_count}")
             
         except Exception as e:
             print(f"❌ Ошибка в автоматическом парсинге: {e}")
@@ -115,10 +124,10 @@ def auto_parse_worker():
 async def root():
     """Главная страница API."""
     return {
-        "message": "RSS Parser API",
+        "message": "RSS & Telegram Parser API",
         "version": "1.0.0",
         "status": "running",
-        "auto_parsing": "enabled (every minute)"
+        "auto_parsing": "enabled (RSS + Telegram every minute)"
     }
 
 @app.get("/health")
@@ -132,18 +141,57 @@ async def health_check():
 
 @app.post("/parse", response_model=ParseResponse)
 async def manual_parse():
-    """Ручной запуск парсинга RSS-лент."""
+    """Ручной запуск парсинга RSS-лент и Telegram каналов."""
     try:
         print("🔄 Ручной парсинг запущен")
-        new_count = parse_and_save_rss()
+        
+        # Парсинг RSS
+        rss_count = parse_and_save_rss()
+        print(f"✅ RSS парсинг завершен. Добавлено статей: {rss_count}")
+        
+        # Парсинг Telegram
+        telegram_count = await parse_and_save_telegram()
+        print(f"✅ Telegram парсинг завершен. Добавлено постов: {telegram_count}")
+        
+        total_count = rss_count + telegram_count
         
         return ParseResponse(
             message="Парсинг завершен успешно",
-            new_articles_count=new_count,
+            new_articles_count=total_count,
             timestamp=datetime.now().isoformat()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка парсинга: {str(e)}")
+
+@app.post("/parse/rss", response_model=ParseResponse)
+async def manual_parse_rss():
+    """Ручной запуск парсинга только RSS-лент."""
+    try:
+        print("🔄 Ручной парсинг RSS запущен")
+        new_count = parse_and_save_rss()
+        
+        return ParseResponse(
+            message="RSS парсинг завершен успешно",
+            new_articles_count=new_count,
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка RSS парсинга: {str(e)}")
+
+@app.post("/parse/telegram", response_model=ParseResponse)
+async def manual_parse_telegram():
+    """Ручной запуск парсинга только Telegram каналов."""
+    try:
+        print("🔄 Ручной парсинг Telegram запущен")
+        new_count = await parse_and_save_telegram()
+        
+        return ParseResponse(
+            message="Telegram парсинг завершен успешно",
+            new_articles_count=new_count,
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка Telegram парсинга: {str(e)}")
 
 @app.get("/articles", response_model=List[ArticleResponse])
 async def get_articles(limit: int = 10):

@@ -9,27 +9,26 @@ import re
 import time
 import os
 
+# "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+    # 'https://www.investing.com/rss/news.rss',  # Investing.com - работает
 
-    # # Investopedia (Все статьи)
-    # 'https://news.google.com/rss?hl=ru&gl=RU&ceid=RU:ru',
-    # 'https://www.investopedia.com/rss-feed-4790074',
+RSS_URLS_OTHER = [
+    'https://lenta.ru/rss/news',
+    'https://habr.com/ru/rss/hubs/all/',
+    'https://feeds.bloomberg.com/markets/news.rss',
+    'https://feeds.bloomberg.com/business/news.rss',
+    'https://www.businessinsider.com/rss',
+]
+    # 'https://fortune.com/feed',  # Fortune - работает
+    # 'https://www.kommersant.ru/RSS/finance.xml',
+
 RSS_URLS = [
     # ----------------------------------------------------
     # ГЛОБАЛЬНЫЕ ФИНАНСОВЫЕ И БИЗНЕС-ИЗДАНИЯ
     # ----------------------------------------------------
-    # 'https://lenta.ru/rss/news',
-    # 'https://habr.com/ru/rss/hubs/all/'
-    
-    # # Bloomberg
-    # 'https://feeds.bloomberg.com/markets/news.rss',
-    # 'https://feeds.bloomberg.com/business/news.rss',
         
     # # CNBC (Top News)
     # 'https://www.cnbc.com/id/100003114/device/rss/rss.html',
-        
-        
-    # # Business Insider (Top News)
-    # 'https://www.businessinsider.com/rss',
 
 
     "https://smart-lab.ru/news/rss/",
@@ -39,15 +38,11 @@ RSS_URLS = [
     # # РОССИЙСКИЕ / РУССКОЯЗЫЧНЫЕ
     # # ----------------------------------------------------
     
-    # # РБК (Все новости)
-    # 'http://static.feed.rbc.ru/rbc/logical/footer/news.rss',
-    
     # # Ведомости (Главные новости)
     # 'https://www.vedomosti.ru/rss/news',
     
     # # Коммерсантъ (Финансы / Рынки)
-    # 'https://www.kommersant.ru/RSS/finance.xml',
-    
+
     # Рабочие RSS-ленты
     # 'https://tass.ru/rss/v2.xml',  # ТАСС - работает
     
@@ -55,8 +50,6 @@ RSS_URLS = [
     # ЭКОНОМИЧЕСКИЕ RSS-ЛЕНТЫ (ПРОВЕРЕНЫ)
     # ----------------------------------------------------
     # 'https://www.ft.com/?format=rss',  # Financial Times - работает
-    # 'https://fortune.com/feed',  # Fortune - работает
-    # 'https://www.investing.com/rss/news.rss',  # Investing.com - работает
     # 'https://finance.yahoo.com/news/rssindex',  # Yahoo Finance - работает
     # 'https://financialpost.com/feed',  # Financial Post - работает
     
