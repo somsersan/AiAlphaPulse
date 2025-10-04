@@ -4,7 +4,7 @@
 """
 
 from typing import List, Optional
-from core.domain.entities import Article, SourceType
+from core.domain.entities import Article
 from core.domain.exceptions import ArticleNotFoundError, InvalidArticleError
 from core.repositories.article_repository import ArticleRepository
 from core.domain.value_objects import WordCount, ReadingTime
@@ -39,8 +39,7 @@ class ArticleService:
             word_count=article_data.get('word_count', 0),
             reading_time=article_data.get('reading_time', 0),
             is_processed=article_data.get('is_processed', False),
-            created_at=article_data.get('created_at'),
-            source_type=SourceType(article_data.get('source_type', 'rss'))
+            created_at=article_data.get('created_at')
         )
 
         # Пересчитываем статистику чтения

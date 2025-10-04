@@ -2,12 +2,11 @@
 SQLAlchemy модели для базы данных.
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
-from core.domain.entities import SourceType
 
 Base = declarative_base()
 
@@ -31,7 +30,6 @@ class ArticleModel(Base):
     reading_time = Column(Integer, default=0)
     is_processed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
-    source_type = Column(Enum(SourceType), default=SourceType.RSS)
 
     def __repr__(self):
         return f"<ArticleModel(title='{self.title[:30]}...', source='{self.source}')>"

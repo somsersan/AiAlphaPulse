@@ -5,7 +5,7 @@
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
-from core.domain.entities import Article, ParsingStats, RSSFeed, TelegramChannel, SourceType
+from core.domain.entities import Article, ParsingStats, RSSFeed, TelegramChannel
 from core.repositories.article_repository import ArticleRepository
 from core.repositories.feed_repository import FeedRepository
 from infrastructure.database.models import ArticleModel, RSSFeedModel, TelegramChannelModel
@@ -35,8 +35,7 @@ class SQLArticleRepository(ArticleRepository):
             word_count=model.word_count,
             reading_time=model.reading_time,
             is_processed=model.is_processed,
-            created_at=model.created_at,
-            source_type=model.source_type
+            created_at=model.created_at
         )
 
     def _entity_to_model(self, entity: Article) -> ArticleModel:
@@ -56,8 +55,7 @@ class SQLArticleRepository(ArticleRepository):
             word_count=entity.word_count,
             reading_time=entity.reading_time,
             is_processed=entity.is_processed,
-            created_at=entity.created_at,
-            source_type=entity.source_type
+            created_at=entity.created_at
         )
 
     async def create(self, article: Article) -> Article:
@@ -128,7 +126,7 @@ class SQLArticleRepository(ArticleRepository):
             # Обновляем поля
             for field in ['title', 'link', 'published', 'summary', 'source', 'feed_url', 
                          'content', 'author', 'category', 'image_url', 'word_count', 
-                         'reading_time', 'is_processed', 'source_type']:
+                         'reading_time', 'is_processed']:
                 setattr(model, field, getattr(article, field))
             
             session.commit()

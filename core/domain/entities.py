@@ -34,7 +34,6 @@ class Article:
     reading_time: int
     is_processed: bool
     created_at: datetime
-    source_type: SourceType = SourceType.RSS
 
     def __post_init__(self):
         """Валидация данных после инициализации."""

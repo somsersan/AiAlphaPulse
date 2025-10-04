@@ -113,9 +113,6 @@ class ParsingService:
                 if exists:
                     continue
 
-                # Добавляем информацию о типе источника
-                article_data['source_type'] = source_type.value
-
                 # Создаем статью через сервис
                 from core.services.article_service import ArticleService
                 article_service = ArticleService(self.article_repository)
