@@ -52,7 +52,7 @@ class ArticleProcessor:
     def load_articles_from_db(self, limit: int = None) -> List[Dict]:
         """Загрузка статей из базы данных"""
         query = """
-        SELECT id, title, link, source, published, is_processed, summary, content
+        SELECT id, title, link, source, published, is_processed, summary, content, links_json
         FROM articles
         ORDER BY published DESC
         """
@@ -63,7 +63,20 @@ class ArticleProcessor:
         with get_db_cursor() as cursor:
             cursor.execute(query)
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            articles = []
+            for row in rows:
+                record = dict(row)
+                links_raw = record.pop('links_json', None)
+                if links_raw:
+                    try:
+                        record['links'] = json.loads(links_raw)
+                    except json.JSONDecodeError:
+                        record['links'] = []
+                else:
+                    record['links'] = []
+                articles.append(record)
+
+            return articles
     
     def load_unprocessed_articles(self, limit: int = None) -> List[Dict]:
         """Загрузка только необработанных статей (эффективный метод)"""

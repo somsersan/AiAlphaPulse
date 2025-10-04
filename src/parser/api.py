@@ -66,6 +66,7 @@ class ArticleResponse(BaseModel):
     image_url: Optional[str]
     summary: Optional[str]
     content: Optional[str]
+    links: List[dict]
 
 class StatsResponse(BaseModel):
     total_articles: int

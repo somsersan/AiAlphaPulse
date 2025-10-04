@@ -1,13 +1,18 @@
+import json
+from dataclasses import dataclass, field
+from datetime import datetime
+import os
+import re
+import time
+from typing import Dict, List, Optional
+from urllib.parse import urljoin
+
 import feedparser
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
-from datetime import datetime
-from dotenv import load_dotenv
-import re
-import time
-import os
 
 
     # # Investopedia (Все статьи)
@@ -58,6 +63,7 @@ class Article(Base):
     source = Column(String)
     feed_url = Column(String)
     content = Column(Text)  # Полный текст статьи
+    links_json = Column(Text)  # Ссылки, извлеченные из статьи
     author = Column(String)  # Автор статьи
     category = Column(String)  # Категория/теги
     image_url = Column(String)  # URL изображения
@@ -71,8 +77,31 @@ class Article(Base):
 
 # --- 3. Функции парсинга и сохранения ---
 
+@dataclass
+class ContentResult:
+    text: Optional[str]
+    links: List[Dict[str, str]] = field(default_factory=list)
+
+
+def _extract_links(element: BeautifulSoup, base_url: str) -> List[Dict[str, str]]:
+    links: List[Dict[str, str]] = []
+    if not element:
+        return links
+
+    for anchor in element.find_all('a', href=True):
+        href = anchor['href'].strip()
+        if not href or href.startswith('#'):
+            continue
+
+        full_href = urljoin(base_url, href)
+        text = anchor.get_text(separator=' ', strip=True) or full_href
+        links.append({'href': full_href, 'text': text})
+
+    return links
+
+
 def extract_full_content(article_url, max_retries=3):
-    """Извлекает полный текст статьи по URL."""
+    """Извлекает полный текст статьи и ссылки по URL."""
     for attempt in range(max_retries):
         try:
             headers = {
@@ -80,42 +109,47 @@ def extract_full_content(article_url, max_retries=3):
             }
             response = requests.get(article_url, headers=headers, timeout=10)
             response.raise_for_status()
-            
+
             soup = BeautifulSoup(response.content, 'html.parser')
-            
+
             # Удаляем ненужные элементы
             for script in soup(["script", "style", "nav", "footer", "aside"]):
                 script.decompose()
-            
+
             # Ищем основной контент по различным селекторам
             content_selectors = [
                 'article', '.article-content', '.post-content', '.entry-content',
                 '.content', '.main-content', '.story-content', '.news-content',
                 '[role="main"]', '.article-body', '.post-body'
             ]
-            
-            content = None
+
+            content_text: Optional[str] = None
+            links: List[Dict[str, str]] = []
             for selector in content_selectors:
                 content_elem = soup.select_one(selector)
                 if content_elem:
-                    content = content_elem.get_text(strip=True)
+                    content_text = content_elem.get_text(separator=' ', strip=True)
+                    links = _extract_links(content_elem, article_url)
                     break
-            
-            if not content:
+
+            if not content_text:
                 # Если не нашли специальный контейнер, берем body
                 body = soup.find('body')
                 if body:
-                    content = body.get_text(strip=True)
-            
-            return content[:5000] if content else None  # Ограничиваем размер
-            
+                    content_text = body.get_text(separator=' ', strip=True)
+                    links = _extract_links(body, article_url)
+
+            if content_text:
+                return ContentResult(text=content_text[:5000], links=links)
+            return ContentResult(text=None, links=links)
+
         except Exception as e:
             print(f"   ⚠️ Ошибка при извлечении контента (попытка {attempt + 1}): {e}")
             if attempt < max_retries - 1:
                 time.sleep(2)  # Пауза перед повтором
             continue
-    
-    return None
+
+    return ContentResult(text=None, links=[])
 
 def extract_article_metadata(entry):
     """Извлекает дополнительные метаданные из RSS-записи."""
@@ -218,11 +252,12 @@ def parse_and_save_rss_custom(session, urls=None):
                     
                     # Извлекаем полный контент (с ограничением по времени)
                     print(f"      🔍 Извлекаем полный контент...")
-                    full_content = extract_full_content(entry.link)
-                    
+                    content_result = extract_full_content(entry.link)
+                    full_content = content_result.text
+
                     # Вычисляем статистику
                     word_count, reading_time = calculate_reading_stats(full_content)
-                    
+
                     # Создаем статью с расширенными данными
                     new_article = Article(
                         title=entry.title,
@@ -232,6 +267,7 @@ def parse_and_save_rss_custom(session, urls=None):
                         source=feed_title,
                         feed_url=url,
                         content=full_content,
+                        links_json=json.dumps(content_result.links, ensure_ascii=False) if content_result.links else None,
                         author=metadata['author'],
                         category=metadata['category'],
                         image_url=metadata['image_url'],
@@ -306,7 +342,8 @@ def check_articles_custom(session, limit=10):
             'link': article.link,
             'image_url': article.image_url,
             'summary': article.summary,
-            'content': article.content
+            'content': article.content,
+            'links': json.loads(article.links_json) if article.links_json else []
         }
         result.append(article_data)
     

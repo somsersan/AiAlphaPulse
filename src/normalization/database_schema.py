@@ -2,6 +2,7 @@
 Схема базы данных для нормализованных новостей
 Поддержка PostgreSQL
 """
+import json
 import psycopg2
 from datetime import datetime
 from typing import List, Dict
@@ -89,7 +90,7 @@ def get_unprocessed_articles(conn: psycopg2.extensions.connection, limit: int = 
     max_id = get_max_processed_id(conn)
     
     query = """
-    SELECT id, title, link, source, published, is_processed, summary, content
+    SELECT id, title, link, source, published, is_processed, summary, content, links_json
     FROM articles
     WHERE id > %s
     ORDER BY id ASC
@@ -101,7 +102,20 @@ def get_unprocessed_articles(conn: psycopg2.extensions.connection, limit: int = 
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute(query, (max_id,))
     rows = cursor.fetchall()
-    return [dict(row) for row in rows]
+    articles = []
+    for row in rows:
+        record = dict(row)
+        links_raw = record.pop('links_json', None)
+        if links_raw:
+            try:
+                record['links'] = json.loads(links_raw)
+            except json.JSONDecodeError:
+                record['links'] = []
+        else:
+            record['links'] = []
+        articles.append(record)
+
+    return articles
 
 
 def insert_normalized_article(conn: psycopg2.extensions.connection, article: dict) -> int:

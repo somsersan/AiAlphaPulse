@@ -1,11 +1,22 @@
+import json
+from dataclasses import dataclass, field
+from datetime import datetime
+import re
+import time
+from typing import Dict, List, Optional
+from urllib.parse import urljoin
+
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
-from datetime import datetime
-import re
-import time
+
+from .rss_parser import (
+    calculate_reading_stats,
+    extract_article_metadata,
+    extract_full_content,
+)
 
 
     # # Investopedia (Все статьи)
@@ -65,7 +76,7 @@ RSS_URLS = [
 ]
 
 # Имя файла базы данных SQLite
-DATABASE_FILE = 'rss_articles.db'
+DATABASE_FILE = 'rss_articles2.db'
 DATABASE_URL = f"sqlite:///{DATABASE_FILE}"
 
 # --- 2. Определение модели БД (SQLAlchemy) ---
@@ -94,101 +105,6 @@ class Article(Base):
         return f"<Article(title='{self.title[:30]}...', source='{self.source}')>"
 
 # --- 3. Функции парсинга и сохранения ---
-
-def extract_full_content(article_url, max_retries=3):
-    """Извлекает полный текст статьи по URL."""
-    for attempt in range(max_retries):
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            response = requests.get(article_url, headers=headers, timeout=10)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Удаляем ненужные элементы
-            for script in soup(["script", "style", "nav", "footer", "aside"]):
-                script.decompose()
-            
-            # Ищем основной контент по различным селекторам
-            content_selectors = [
-                'article', '.article-content', '.post-content', '.entry-content',
-                '.content', '.main-content', '.story-content', '.news-content',
-                '[role="main"]', '.article-body', '.post-body'
-            ]
-            
-            content = None
-            for selector in content_selectors:
-                content_elem = soup.select_one(selector)
-                if content_elem:
-                    content = content_elem.get_text(strip=True)
-                    break
-            
-            if not content:
-                # Если не нашли специальный контейнер, берем body
-                body = soup.find('body')
-                if body:
-                    content = body.get_text(strip=True)
-            
-            return content[:5000] if content else None  # Ограничиваем размер
-            
-        except Exception as e:
-            print(f"   ⚠️ Ошибка при извлечении контента (попытка {attempt + 1}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(2)  # Пауза перед повтором
-            continue
-    
-    return None
-
-def extract_article_metadata(entry):
-    """Извлекает дополнительные метаданные из RSS-записи."""
-    metadata = {
-        'author': None,
-        'category': None,
-        'image_url': None
-    }
-    
-    # Автор
-    if hasattr(entry, 'author'):
-        metadata['author'] = entry.author
-    elif hasattr(entry, 'author_detail') and hasattr(entry.author_detail, 'name'):
-        metadata['author'] = entry.author_detail.name
-    
-    # Категория/теги
-    if hasattr(entry, 'tags') and entry.tags:
-        categories = [tag.term for tag in entry.tags if hasattr(tag, 'term')]
-        metadata['category'] = ', '.join(categories[:3])  # Берем первые 3 тега
-    
-    # Изображение
-    if hasattr(entry, 'media_content') and entry.media_content:
-        for media in entry.media_content:
-            if hasattr(media, 'type') and 'image' in media.type:
-                metadata['image_url'] = media.url
-                break
-    
-    # Альтернативные способы поиска изображения
-    if not metadata['image_url'] and hasattr(entry, 'enclosures'):
-        for enclosure in entry.enclosures:
-            if hasattr(enclosure, 'type') and 'image' in enclosure.type:
-                metadata['image_url'] = enclosure.href
-                break
-    
-    return metadata
-
-def calculate_reading_stats(content):
-    """Вычисляет статистику чтения."""
-    if not content:
-        return 0, 0
-    
-    # Подсчет слов (простая логика)
-    words = re.findall(r'\b\w+\b', content.lower())
-    word_count = len(words)
-    
-    # Время чтения (примерно 200 слов в минуту)
-    reading_time = max(1, word_count // 200)
-    
-    return word_count, reading_time
 
 def setup_database():
     """Настраивает соединение с БД и создает таблицы, если их нет."""
@@ -241,11 +157,17 @@ def parse_and_save_rss():
                     
                     # Извлекаем полный контент (с ограничением по времени)
                     print(f"      🔍 Извлекаем полный контент...")
-                    full_content = extract_full_content(entry.link)
-                    
+                    content_result = extract_full_content(entry.link)
+                    full_content = content_result.text
+
                     # Вычисляем статистику
                     word_count, reading_time = calculate_reading_stats(full_content)
-                    
+
+                    content_to_store = full_content
+                    if content_result.links:
+                        links_block = "\n\nСсылки:\n" + "\n".join(content_result.links)
+                        content_to_store = (full_content + links_block) if full_content else links_block
+
                     # Создаем статью с расширенными данными
                     new_article = Article(
                         title=entry.title,
@@ -254,7 +176,7 @@ def parse_and_save_rss():
                         summary=entry.summary if hasattr(entry, 'summary') else 'Нет описания',
                         source=feed_title,
                         feed_url=url,
-                        content=full_content,
+                        content=content_to_store,
                         author=metadata['author'],
                         category=metadata['category'],
                         image_url=metadata['image_url'],

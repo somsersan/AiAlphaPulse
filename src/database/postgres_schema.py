@@ -19,6 +19,7 @@ def create_articles_table(conn: psycopg2.extensions.connection):
         source VARCHAR,
         feed_url VARCHAR,
         content TEXT,
+        links_json TEXT,
         author VARCHAR,
         category VARCHAR,
         image_url VARCHAR,
