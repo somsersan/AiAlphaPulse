@@ -47,39 +47,29 @@ class ParsingSettings(BaseSettings):
         env_prefix = "PARSING_"
 
 
+
 class RSSSettings(BaseSettings):
     """Настройки RSS."""
     urls: List[str] = Field(default_factory=lambda: [
-        'https://www.cnbc.com/id/100003114/device/rss/rss.html',
-
-
-        "https://smart-lab.ru/news/rss/",
-        "https://smart-lab.ru/forum/rss/",
-        
-        # ----------------------------------------------------
-        # РОССИЙСКИЕ / РУССКОЯЗЫЧНЫЕ
-        # ----------------------------------------------------
-        
-        # Ведомости (Главные новости)
-        'https://www.vedomosti.ru/rss/news',
-        
-        # Коммерсантъ (Финансы / Рынки)
-
-        # Рабочие RSS-ленты
-        'https://tass.ru/rss/v2.xml',  # ТАСС - работает
-        
-        # ----------------------------------------------------
-        # ЭКОНОМИЧЕСКИЕ RSS-ЛЕНТЫ (ПРОВЕРЕНЫ)
-        # ----------------------------------------------------
-        'https://www.ft.com/?format=rss',  # Financial Times - работает
-        'https://finance.yahoo.com/news/rssindex',  # Yahoo Finance - работает
-        'https://financialpost.com/feed',  # Financial Post - работает
-        
-        # ----------------------------------------------------
-        # РОССИЙСКИЕ ЭКОНОМИЧЕСКИЕ RSS-ЛЕНТЫ (ПРОВЕРЕНЫ)
-        # ----------------------------------------------------
-        'https://www.kommersant.ru/RSS/news.xml',  # Коммерсантъ - работает
-    ], env="RSS_URLS")
+    # 'https://www.coindesk.com/arc/outboundfeeds/rss/',
+    
+    'https://cointelegraph.com/rss',
+    
+    'https://crypto.news/feed/',
+    
+    'https://bitcoinmagazine.com/.rss/full/',
+    
+    'https://www.theblock.co/rss.xml',
+    
+    'https://decrypt.co/feed',
+    
+    'https://cryptoslate.com/feed/',
+    
+    'https://news.bitcoin.com/feed/',
+    
+    'https://beincrypto.com/feed/',
+    
+    'https://u.today/rss'], env="RSS_URLS")
 
     class Config:
         env_prefix = "RSS_"
