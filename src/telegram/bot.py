@@ -33,8 +33,15 @@ class NewsBot:
         if not self.token:
             raise ValueError("TELEGRAM_BOT_TOKEN не установлен в .env")
         
+        # TELEGRAM_CHAT_ID теперь не обязателен - используем подписчиков из БД
+        self.legacy_chat_id = os.getenv('TELEGRAM_CHAT_ID')  # Для обратной совместимости
+        
         self.analyzer = NewsAnalyzer()
         self.app = Application.builder().token(self.token).build()
+        
+        # Настройка таймаутов для избежания ошибок подключения
+        self.app.bot.request.timeout = 30
+        self.app.bot.request.connect_timeout = 10
         
         # Регистрируем команды
         self.app.add_handler(CommandHandler("start", self.start_command))
@@ -54,9 +61,6 @@ class NewsBot:
         self.hotness_threshold = hotness_threshold
         self.check_interval = check_interval
         self.notified_news: Set[int] = set()
-        
-        # TELEGRAM_CHAT_ID теперь не обязателен - используем подписчиков из БД
-        self.legacy_chat_id = os.getenv('TELEGRAM_CHAT_ID')  # Для обратной совместимости
     
     def _init_subscribers_table(self):
         """Инициализировать таблицу подписчиков"""
@@ -390,13 +394,15 @@ class NewsBot:
                 'headline': news['headline'],
                 'content': news['content'],
                 'tickers': news['tickers'],
-                'hotness': news['ai_hotness']
+                'hotness': news['ai_hotness'],
+                'urls': news.get('urls', []),
+                'published_at': news.get('published_time', ''),
+                'source': news.get('source', 'Неизвестный источник')
             })
             
-            # Форматируем и отправляем
-            detail_message = self.format_detailed_analysis(news, analysis)
+            # Форматируем и отправляем (теперь analysis содержит готовую карточку)
             await query.edit_message_text(
-                detail_message,
+                analysis.get('analysis_text', 'Анализ недоступен'),
                 parse_mode=ParseMode.MARKDOWN,
                 disable_web_page_preview=True
             )
@@ -612,32 +618,9 @@ class NewsBot:
         return message
     
     def format_detailed_analysis(self, news: Dict, analysis: Dict) -> str:
-        """Форматирование детального анализа"""
-        hotness = news['ai_hotness']
-        hotness_emoji = self._get_hotness_emoji(hotness)
-        
-        # Для детального анализа используем Markdown с моноширинным шрифтом
-        message = f"""
-{hotness_emoji} *ДЕТАЛЬНЫЙ АНАЛИЗ*
-
-*{news['headline']}*
-
-🔥 *Hotness:* {hotness:.2f}/1.00
-
-💡 *Почему важно сейчас:*
-{analysis.get('why_now', 'Анализ формируется...')}
-
-📝 *Черновик анализа:*
-```
-{analysis.get('draft', 'Детали формируются...')}
-```
-        """.strip()
-        
-        # Добавляем торговый сигнал для горячих новостей
-        if hotness >= 0.7 and 'trading_signal' in analysis:
-            message += f"\n\n🎯 *ТОРГОВЫЙ СИГНАЛ:*\n```\n{analysis['trading_signal']}\n```"
-        
-        return message
+        """Форматирование детального анализа (теперь возвращает готовую карточку)"""
+        # analysis уже содержит готовую карточку в формате Markdown
+        return analysis.get('analysis_text', 'Анализ недоступен')
     
     def _get_hotness_emoji(self, hotness: float) -> str:
         """Эмодзи в зависимости от горячности"""
@@ -684,10 +667,13 @@ class NewsBot:
                             'headline': news['headline'],
                             'content': news['content'],
                             'tickers': news['tickers'],
-                            'hotness': news['ai_hotness']
+                            'hotness': news['ai_hotness'],
+                            'urls': news.get('urls', []),
+                            'published_at': news.get('published_time', ''),
+                            'source': news.get('source', 'Неизвестный источник')
                         })
                         
-                        # Форматируем сообщение
+                        # Форматируем сообщение (добавляем заголовок алерта)
                         message = self.format_hot_news_alert(news, analysis)
                         
                         # Отправляем всем подписчикам
@@ -776,45 +762,27 @@ class NewsBot:
     def format_hot_news_alert(self, news: dict, analysis: dict) -> str:
         """Форматирование алерта о горячей новости"""
         hotness = news['ai_hotness']
-        tickers_str = ', '.join(news['tickers']) if news['tickers'] else 'не указаны'
         
-        urls = news.get('urls', [])[:3]
-        sources_str = '\n'.join([f"• {url}" for url in urls]) if urls else 'нет'
-        
+        # Получаем timeline для контекста
         first_time = news.get('first_time')
         last_time = news.get('last_time')
         timeline = f"Первое: {first_time.strftime('%d.%m %H:%M')}"
-        if first_time != last_time:
-            timeline += f"\nПоследнее: {last_time.strftime('%d.%m %H:%M')}"
+        if first_time and last_time and first_time != last_time:
+            timeline += f" | Последнее: {last_time.strftime('%d.%m %H:%M')}"
         
-        message = f"""
-🚨 *ГОРЯЧАЯ НОВОСТЬ!*
+        # Формируем заголовок алерта + готовая аналитическая карточка
+        header = f"""🚨 *ГОРЯЧАЯ НОВОСТЬ!*
 🔥 *Hotness: {hotness:.2f}/1.00*
+📄 *Документов в кластере:* {news.get('doc_count', 1)}
+⏰ *Timeline:* {timeline}
 
-*{news['headline']}*
-
-💡 *Почему важно сейчас:*
-{analysis.get('why_now', 'Формируется анализ...')}
-
-📊 *Тикеры:* {tickers_str}
-📄 *Документов:* {news.get('doc_count', 1)}
-
-⏰ *Timeline:*
-{timeline}
-
-📝 *Черновик анализа:*
-```
-{analysis.get('draft', 'Детали формируются...')}
-```
-        """.strip()
+{'='*40}
+"""
         
-        # Добавляем торговый сигнал если есть
-        if 'trading_signal' in analysis:
-            message += f"\n\n🎯 *ТОРГОВЫЙ СИГНАЛ:*\n```\n{analysis['trading_signal']}\n```"
+        # Добавляем готовую аналитическую карточку
+        analysis_card = analysis.get('analysis_text', 'Анализ недоступен')
         
-        message += f"\n\n🔗 *Источники:*\n{sources_str}"
-        
-        return message
+        return header + analysis_card
     
     async def post_init(self, application):
         """Инициализация после запуска бота"""
@@ -830,5 +798,17 @@ class NewsBot:
         # Регистрируем post_init callback
         self.app.post_init = self.post_init
         
-        self.app.run_polling(allowed_updates=Update.ALL_TYPES)
+        try:
+            self.app.run_polling(
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True,
+                close_loop=False
+            )
+        except Exception as e:
+            print(f"❌ Ошибка запуска бота: {e}")
+            print("Проверьте:")
+            print("1. Правильность TELEGRAM_BOT_TOKEN в .env")
+            print("2. Подключение к интернету")
+            print("3. Доступность Telegram API")
+            raise
 

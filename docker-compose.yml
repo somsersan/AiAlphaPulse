@@ -152,3 +152,6 @@ services:
 #
 # ПОТОК ДАННЫХ:
 # Parser → financial_news_view → normalized_articles → story_clusters → llm_analyzed_news → Telegram Bot
+
+
+

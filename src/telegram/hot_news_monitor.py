@@ -51,7 +51,10 @@ class HotNewsMonitor:
                     'headline': news['headline'],
                     'content': news['content'],
                     'tickers': news['tickers'],
-                    'hotness': news['ai_hotness']
+                    'hotness': news['ai_hotness'],
+                    'urls': news.get('urls', []),
+                    'published_at': news.get('published_time', ''),
+                    'source': news.get('source', 'Неизвестный источник')
                 })
                 
                 # Форматируем сообщение
@@ -117,47 +120,28 @@ class HotNewsMonitor:
     
     def format_hot_news_alert(self, news: dict, analysis: dict) -> str:
         """Форматирование алерта о горячей новости"""
-        
         hotness = news['ai_hotness']
-        tickers_str = ', '.join(news['tickers']) if news['tickers'] else 'не указаны'
         
-        # Ссылки
-        urls = news.get('urls', [])[:3]
-        sources_str = '\n'.join([f"• {url}" for url in urls]) if urls else 'нет'
-        
-        # Timeline
+        # Получаем timeline для контекста
         first_time = news.get('first_time')
         last_time = news.get('last_time')
         timeline = f"Первое: {first_time.strftime('%d.%m %H:%M')}"
-        if first_time != last_time:
-            timeline += f"\nПоследнее: {last_time.strftime('%d.%m %H:%M')}"
+        if first_time and last_time and first_time != last_time:
+            timeline += f" | Последнее: {last_time.strftime('%d.%m %H:%M')}"
         
-        message = f"""
-🚨 *ГОРЯЧАЯ НОВОСТЬ!*
+        # Формируем заголовок алерта + готовая аналитическая карточка
+        header = f"""🚨 *ГОРЯЧАЯ НОВОСТЬ!*
 🔥 *Hotness: {hotness:.2f}/1.00*
+📄 *Документов в кластере:* {news.get('doc_count', 1)}
+⏰ *Timeline:* {timeline}
 
-*{news['headline']}*
-
-💡 *Почему важно сейчас:*
-{analysis.get('why_now', 'Формируется анализ...')}
-
-📊 *Тикеры:* {tickers_str}
-📄 *Документов:* {news.get('doc_count', 1)}
-
-⏰ *Timeline:*
-{timeline}
-
-📝 *Анализ:*
-{analysis.get('draft', 'Детали формируются...')}
-
-🎯 *ТОРГОВЫЙ СИГНАЛ:*
-{analysis.get('trading_signal', '⚠️ Требуется ручной анализ')}
-
-🔗 *Источники:*
-{sources_str}
-        """.strip()
+{'='*40}
+"""
         
-        return message
+        # Добавляем готовую аналитическую карточку
+        analysis_card = analysis.get('analysis_text', 'Анализ недоступен')
+        
+        return header + analysis_card
     
     async def run(self):
         """Запуск мониторинга в цикле"""
@@ -176,4 +160,7 @@ class HotNewsMonitor:
             except Exception as e:
                 print(f"❌ Ошибка в мониторе: {e}")
                 await asyncio.sleep(self.check_interval)
+
+
+
 
