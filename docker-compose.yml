@@ -41,6 +41,7 @@ services:
       sh -c "
         echo '🔄 Инициализация базы данных...' &&
         python init_db.py &&
+<<<<<<< Updated upstream
         echo '🚀 Запуск FastAPI приложения...' &&
         uvicorn main:app --host 0.0.0.0 --port 8000
       "
@@ -59,6 +60,25 @@ services:
   #   networks:
   #     - rss_network
   #   restart: unless-stopped
+=======
+        echo '🚀 Запуск FastAPI приложения с чистой архитектурой...' &&
+        uvicorn main_new:app --host 0.0.0.0 --port 8000
+      "
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rss_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@rss.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - rss_network
+    restart: unless-stopped
+>>>>>>> Stashed changes
 
 volumes:
   postgres_data:

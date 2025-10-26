@@ -37,10 +37,26 @@ def init_database():
         sys.exit(1)
     
     try:
+<<<<<<< Updated upstream
         from rss_parser import setup_database
         session = setup_database()
         print("✅ База данных инициализирована успешно")
         session.close()
+=======
+        from infrastructure.database.connection import db_connection
+        from infrastructure.external.feed_initializer import FeedInitializer
+        
+        # Создаем таблицы
+        db_connection.create_tables()
+        print("✅ Таблицы созданы успешно")
+        
+        # Инициализируем ленты и каналы
+        feed_initializer = FeedInitializer()
+        import asyncio
+        asyncio.run(feed_initializer.initialize_feeds())
+        print("✅ Ленты и каналы инициализированы успешно")
+        
+>>>>>>> Stashed changes
     except Exception as e:
         print(f"❌ Ошибка инициализации базы данных: {e}")
         sys.exit(1)
