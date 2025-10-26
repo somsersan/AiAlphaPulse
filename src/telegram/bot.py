@@ -48,6 +48,7 @@ class NewsBot:
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CommandHandler("top", self.top_command))
         self.app.add_handler(CommandHandler("latest", self.latest_command))
+        self.app.add_handler(CommandHandler("search", self.search_command))
         self.app.add_handler(CommandHandler("subscribe", self.subscribe_command))
         self.app.add_handler(CommandHandler("unsubscribe", self.unsubscribe_command))
         self.app.add_handler(CommandHandler("mystatus", self.mystatus_command))
@@ -92,6 +93,7 @@ I'll help you track the hottest financial news.
 📊 <b>Available commands:</b>
 /top - Top news by hotness
 /latest - Latest added news
+/search - Search news by keywords
 /subscribe - Subscribe to notifications
 /unsubscribe - Unsubscribe from notifications
 /mystatus - Check subscription status
@@ -102,6 +104,8 @@ I'll help you track the hottest financial news.
 <code>/top 5 48</code> - Top 5 for 48 hours
 <code>/latest 5</code> - Latest 5 news
 <code>/latest</code> - Latest 10 news
+<code>/search Bitcoin</code> - Search for Bitcoin
+<code>/search BTC ETH</code> - Search for BTC or ETH
 
 🔔 <b>Auto-notifications:</b>
 Subscribe with /subscribe to receive hot news (hotness ≥ 0.7) automatically!
@@ -131,6 +135,17 @@ Subscribe with /subscribe to receive hot news (hotness ≥ 0.7) automatically!
 <code>/latest</code> - Latest 10 news
 <code>/latest 5</code> - Latest 5 news
 <code>/latest 20</code> - Latest 20 news
+
+<b>3️⃣ Search news:</b>
+<code>/search keyword1 [keyword2 ...]</code>
+• Search by one or multiple keywords
+• Searches in headline and content
+• Returns up to 10 most recent matches
+
+<b>Examples:</b>
+<code>/search Bitcoin</code> - Find news about Bitcoin
+<code>/search BTC ETH</code> - Find news with BTC or ETH
+<code>/search bull market</code> - Find news about bull market
 
 📊 <b>What's shown:</b>
 • News headline
@@ -373,6 +388,67 @@ To subscribe: /subscribe
                 disable_web_page_preview=True
             )
     
+    async def search_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Command /search [keywords] - search news by keywords"""
+        # Parse arguments
+        args = context.args
+        
+        if not args:
+            await update.message.reply_text(
+                "❌ Please specify keywords to search.\n\n"
+                "<b>Examples:</b>\n"
+                "<code>/search Bitcoin</code>\n"
+                "<code>/search BTC ETH</code>\n"
+                "<code>/search bull market</code>",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        keywords = args
+        keywords_str = ' '.join(keywords)
+        
+        await update.message.reply_text(
+            f"🔍 Searching news by keywords: <b>{escape(keywords_str)}</b>",
+            parse_mode=ParseMode.HTML
+        )
+        
+        # Get news from DB
+        news_list = self.search_news(keywords, limit=10)
+        
+        if not news_list:
+            await update.message.reply_text(
+                f"📭 No news found for query <b>{escape(keywords_str)}</b>.\n\n"
+                "Try using different keywords.",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # Send header with results count
+        await update.message.reply_text(
+            f"✅ Found <b>{len(news_list)}</b> news item(s)",
+            parse_mode=ParseMode.HTML
+        )
+        
+        # Send each news item
+        for i, news in enumerate(news_list, 1):
+            message = self.format_search_news_message(news, i, len(news_list), keywords_str)
+            
+            # Add button for detailed analysis
+            keyboard = [[
+                InlineKeyboardButton(
+                    "📊 Detailed Analysis", 
+                    callback_data=f"analyze_{news['id']}"
+                )
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                message,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+                disable_web_page_preview=True
+            )
+    
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle button presses"""
         query = update.callback_query
@@ -471,6 +547,65 @@ To subscribe: /subscribe
                 ORDER BY lan.created_at DESC
                 LIMIT %s
             """, (limit,))
+            
+            news_list = []
+            for row in cursor.fetchall():
+                news_list.append({
+                    'id': row['id'],
+                    'headline': row['headline'],
+                    'content': row['content'],
+                    'ai_hotness': row['ai_hotness'],
+                    'tickers': json.loads(row['tickers_json']) if row['tickers_json'] else [],
+                    'urls': json.loads(row['urls_json']) if row['urls_json'] else [],
+                    'published_time': row['published_time'],
+                    'created_at': row['created_at'],
+                    'first_time': row['first_time'],
+                    'last_time': row['last_time'],
+                    'doc_count': row['doc_count']
+                })
+            
+            return news_list
+    
+    def search_news(self, keywords: List[str], limit: int = 10) -> List[Dict]:
+        """Search news by keywords in headline and content"""
+        with get_db_cursor() as cursor:
+            # Build OR conditions for each keyword
+            # Use ~* operator (case-insensitive regex) for flexible matching
+            # This allows partial matches anywhere in the text
+            conditions = []
+            params = []
+            
+            for keyword in keywords:
+                # Escape special regex characters and create pattern
+                # ~* is PostgreSQL's case-insensitive regex operator
+                conditions.append("(lan.headline ~* %s OR lan.content ~* %s)")
+                params.extend([keyword, keyword])
+            
+            where_clause = " OR ".join(conditions)
+            params.append(limit)
+            
+            query = f"""
+                SELECT 
+                    lan.id,
+                    lan.headline,
+                    lan.content,
+                    lan.ai_hotness,
+                    lan.tickers_json,
+                    lan.urls_json,
+                    lan.published_time,
+                    lan.created_at,
+                    lan.id_cluster,
+                    sc.first_time,
+                    sc.last_time,
+                    sc.doc_count
+                FROM llm_analyzed_news lan
+                JOIN story_clusters sc ON lan.id_cluster = sc.id
+                WHERE {where_clause}
+                ORDER BY lan.published_time DESC
+                LIMIT %s
+            """
+            
+            cursor.execute(query, tuple(params))
             
             news_list = []
             for row in cursor.fetchall():
@@ -609,6 +744,49 @@ To subscribe: /subscribe
 📄 <b>Documents:</b> {news.get('doc_count', 1)}
 
 ⏰ <b>Added to system:</b> {created_str}
+📅 <b>Published:</b> {published_str}
+
+🔗 <b>Sources:</b>
+{sources_str}
+        """.strip()
+        
+        return message
+    
+    def format_search_news_message(self, news: Dict, index: int, total: int, keywords: str) -> str:
+        """Format message for search results"""
+        hotness = news['ai_hotness']
+        hotness_emoji = self._get_hotness_emoji(hotness)
+        
+        # Escape for HTML
+        headline_escaped = escape(news['headline'])
+        
+        # Tickers
+        tickers_list = news.get('tickers', [])
+        tickers_str = escape(', '.join(tickers_list)) if tickers_list else '—'
+        
+        # Links (max 3)
+        urls = news.get('urls', [])[:3]
+        if urls:
+            sources_list = []
+            for url in urls:
+                display_url = url if len(url) < 50 else url[:47] + '...'
+                sources_list.append(f'• <a href="{url}">{escape(display_url)}</a>')
+            sources_str = '\n'.join(sources_list)
+        else:
+            sources_str = '—'
+        
+        # Publication time
+        published_time = news.get('published_time')
+        published_str = published_time.strftime('%d.%m.%Y %H:%M') if published_time else '—'
+        
+        message = f"""
+🔍 <b>#{index}/{total} Search Result</b>
+
+<b>{headline_escaped}</b>
+
+🔥 <b>Hotness:</b> {hotness:.2f}/1.00
+📊 <b>Tickers:</b> {tickers_str}
+📄 <b>Documents:</b> {news.get('doc_count', 1)}
 📅 <b>Published:</b> {published_str}
 
 🔗 <b>Sources:</b>
