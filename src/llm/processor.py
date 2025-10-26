@@ -1,4 +1,4 @@
-"""Процессор для LLM анализа новостных кластеров"""
+"""Processor for LLM analysis of news clusters"""
 import json
 import time
 from typing import Dict, Optional
@@ -14,43 +14,43 @@ from .schema import (
 
 
 class LLMNewsProcessor:
-    """Процессор для анализа новостей через LLM"""
+    """Processor for analyzing news via LLM"""
     
     def __init__(self, conn: psycopg2.extensions.connection, api_key: str = None, 
                  model: str = None):
         self.conn = conn
         self.llm_client = OpenRouterClient(api_key=api_key, model=model)
         
-        # Создаем таблицу если не существует
+        # Create table if not exists
         create_llm_news_table(conn)
         
     def process_cluster(self, cluster_id: int) -> Optional[Dict]:
-        """Обработать один кластер"""
+        """Process one cluster"""
         
         try:
-            # СНАЧАЛА проверяем, не обработан ли уже этот кластер
+            # FIRST check if cluster already processed
             cursor = self.conn.cursor()
             cursor.execute("SELECT id FROM llm_analyzed_news WHERE id_cluster = %s", (cluster_id,))
             if cursor.fetchone():
-                print(f"  ⏭️  Пропущен (обработан другим процессом)")
+                print(f"  ⏭️  Skipped (processed by another process)")
                 return None
             
-            # Получаем представительную статью из кластера
+            # Get representative article from cluster
             article = get_cluster_representative_article(self.conn, cluster_id)
             
             if not article:
-                print(f"⚠️  Кластер {cluster_id}: нет статей")
+                print(f"⚠️  Cluster {cluster_id}: no articles")
                 return None
             
-            print(f"📰 Обрабатываем кластер {cluster_id}: {article['title'][:60]}...")
+            print(f"📰 Processing cluster {cluster_id}: {article['title'][:60]}...")
             
-            # Анализируем через LLM
+            # Analyze via LLM
             analysis = self.llm_client.analyze_news(
                 headline=article['title'],
                 content=article['content'] or article['title']
             )
             
-            # Получаем все URL из кластера
+            # Get all URLs from cluster
             cursor = self.conn.cursor()
             try:
                 cursor.execute("""
@@ -60,10 +60,10 @@ class LLMNewsProcessor:
                 urls = [row[0] for row in cursor.fetchall()]
             except psycopg2.Error as e:
                 self.conn.rollback()
-                print(f"  ⚠️ Ошибка получения URL: {e}")
+                print(f"  ⚠️ Error getting URLs: {e}")
                 urls = []
             
-            # Подготавливаем данные для вставки
+            # Prepare data for insertion
             data = {
                 'id_old': article['normalized_id'],
                 'id_cluster': cluster_id,
@@ -73,15 +73,15 @@ class LLMNewsProcessor:
                 'published_time': article['published_at'],
                 'ai_hotness': analysis['hotness'],
                 'tickers_json': json.dumps(analysis['tickers'], ensure_ascii=False),
-                'reasoning': analysis.get('reasoning', '')  # Добавляем обоснование
+                'reasoning': analysis.get('reasoning', '')  # Add reasoning
             }
             
-            # Вставляем в БД
+            # Insert into DB
             new_id = insert_llm_analyzed_news(self.conn, data)
             
             if not new_id:
-                # Ошибка вставки - это не должно случаться, т.к. мы берем только необработанные
-                print(f"  ❌ Не удалось вставить в БД (возможно дубликат)")
+                # Insert error - should not happen since we only get unprocessed
+                print(f"  ❌ Failed to insert into DB (possible duplicate)")
                 return None
             
             reasoning_short = analysis.get('reasoning', '')[:80] + '...' if len(analysis.get('reasoning', '')) > 80 else analysis.get('reasoning', '')
@@ -91,16 +91,16 @@ class LLMNewsProcessor:
             return data
                 
         except psycopg2.Error as e:
-            # Откатываем транзакцию при любой ошибке БД
+            # Rollback transaction on any DB error
             self.conn.rollback()
-            print(f"  ❌ Ошибка БД при обработке кластера {cluster_id}: {e}")
+            print(f"  ❌ DB error processing cluster {cluster_id}: {e}")
             return None
         except Exception as e:
-            print(f"  ❌ Неожиданная ошибка при обработке кластера {cluster_id}: {e}")
+            print(f"  ❌ Unexpected error processing cluster {cluster_id}: {e}")
             return None
     
     def process_batch(self, limit: int = 10, delay: float = 1.0) -> Dict:
-        """Обработать пакет необработанных кластеров"""
+        """Process batch of unprocessed clusters"""
         
         stats = {
             'processed': 0,
@@ -109,26 +109,26 @@ class LLMNewsProcessor:
         }
         
         total_requested = limit
-        batch_size = 50  # Запрашиваем небольшими порциями для свежести данных
+        batch_size = 50  # Request in small batches for data freshness
         
-        print(f"\n🔍 Начинаем обработку (цель: {total_requested} кластеров)...\n")
+        print(f"\n🔍 Starting processing (target: {total_requested} clusters)...\n")
         
         while stats['processed'] < total_requested:
-            # Сколько еще нужно обработать
+            # How many more need to be processed
             remaining = total_requested - stats['processed']
             fetch_limit = min(remaining, batch_size)
             
-            # Получаем СВЕЖИЙ список необработанных кластеров
+            # Get FRESH list of unprocessed clusters
             clusters = get_unprocessed_clusters(self.conn, limit=fetch_limit)
             
             if not clusters:
-                print(f"\n✅ Больше нет необработанных кластеров!")
+                print(f"\n✅ No more unprocessed clusters!")
                 break
             
-            print(f"📦 Батч: найдено {len(clusters)} необработанных кластеров")
+            print(f"📦 Batch: found {len(clusters)} unprocessed clusters")
             
             for cluster in clusters:
-                # Текущий прогресс
+                # Current progress
                 current = stats['processed'] + stats['skipped'] + stats['errors'] + 1
                 
                 try:
@@ -143,32 +143,32 @@ class LLMNewsProcessor:
                     else:
                         stats['errors'] += 1
                     
-                    # Задержка между запросами к API
+                    # Delay between API requests
                     time.sleep(delay)
                     
-                    # Прерываем если достигли лимита ОБРАБОТАННЫХ (не считая пропущенные)
+                    # Break if reached limit of PROCESSED (not counting skipped)
                     if stats['processed'] >= total_requested:
                         break
                         
                 except Exception as e:
-                    print(f"  ❌ Ошибка: {e}")
+                    print(f"  ❌ Error: {e}")
                     stats['errors'] += 1
                     continue
         
         print(f"\n{'='*60}")
-        print(f"📊 ИТОГИ ОБРАБОТКИ")
+        print(f"📊 PROCESSING SUMMARY")
         print(f"{'='*60}")
-        print(f"✅ Обработано успешно: {stats['processed']}")
-        print(f"⏭️  Пропущено (уже обработаны): {stats['skipped']}")
-        print(f"❌ Ошибок: {stats['errors']}")
+        print(f"✅ Processed successfully: {stats['processed']}")
+        print(f"⏭️  Skipped (already processed): {stats['skipped']}")
+        print(f"❌ Errors: {stats['errors']}")
         total_attempts = stats['processed'] + stats['errors']
         if total_attempts > 0:
-            print(f"📈 Успешность: {stats['processed']*100/total_attempts:.1f}%")
+            print(f"📈 Success rate: {stats['processed']*100/total_attempts:.1f}%")
         
         return stats
     
     def get_top_hot_news(self, limit: int = 10, min_hotness: float = 0.7):
-        """Получить топ самых горячих новостей"""
+        """Get top hottest news"""
         
         query = """
         SELECT 
@@ -191,7 +191,7 @@ class LLMNewsProcessor:
         results = []
         for row in cursor.fetchall():
             data = dict(zip(columns, row))
-            # Парсим JSON поля
+            # Parse JSON fields
             data['tickers'] = json.loads(data['tickers_json']) if data['tickers_json'] else []
             data['urls'] = json.loads(data['urls_json']) if data['urls_json'] else []
             results.append(data)

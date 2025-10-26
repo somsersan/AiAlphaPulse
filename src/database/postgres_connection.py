@@ -12,17 +12,18 @@ class PostgreSQLConnection:
     """Класс для работы с PostgreSQL"""
     
     def __init__(self, 
-                 host: str = "130.193.55.244",
-                 port: int = 5432,
-                 database: str = "alphapulse", 
-                 user: str = "admin",
-                 password: str = "04102025"):
+                 host: str = None,
+                 port: int = None,
+                 database: str = None, 
+                 user: str = None,
+                 password: str = None):
+        # Берем параметры из переменных окружения или используем дефолтные значения
         self.connection_params = {
-            'host': host,
-            'port': port,
-            'database': database,
-            'user': user,
-            'password': password
+            'host': host or os.getenv('POSTGRES_HOST', '130.193.55.244'),
+            'port': port or int(os.getenv('POSTGRES_PORT', '5432')),
+            'database': database or os.getenv('POSTGRES_DB', 'alphapulse'),
+            'user': user or os.getenv('POSTGRES_USER', 'admin'),
+            'password': password or os.getenv('POSTGRES_PASSWORD', '04102025')
         }
         self._connection = None
     

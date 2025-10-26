@@ -1,4 +1,4 @@
-"""Монитор горячих новостей для автоматических уведомлений"""
+"""Hot news monitor for automatic notifications"""
 import asyncio
 import json
 from datetime import datetime
@@ -15,38 +15,38 @@ load_dotenv()
 
 
 class HotNewsMonitor:
-    """Мониторинг и отправка уведомлений о горячих новостях"""
+    """Monitor and send notifications about hot news"""
     
     def __init__(self, hotness_threshold: float = 0.7, check_interval: int = 60):
         self.token = os.getenv('TELEGRAM_BOT_TOKEN')
         self.chat_id = os.getenv('TELEGRAM_CHAT_ID')
         
         if not self.token:
-            raise ValueError("TELEGRAM_BOT_TOKEN не установлен в .env")
+            raise ValueError("TELEGRAM_BOT_TOKEN not set in .env")
         if not self.chat_id:
-            raise ValueError("TELEGRAM_CHAT_ID не установлен в .env")
+            raise ValueError("TELEGRAM_CHAT_ID not set in .env")
         
         self.bot = Bot(token=self.token)
         self.analyzer = NewsAnalyzer()
         
         self.hotness_threshold = hotness_threshold
         self.check_interval = check_interval
-        self.notified_news: Set[int] = set()  # ID уже отправленных новостей
+        self.notified_news: Set[int] = set()  # IDs of already sent news
     
     async def check_and_notify(self):
-        """Проверка новых горячих новостей и отправка уведомлений"""
+        """Check new hot news and send notifications"""
         
-        # Получаем горячие новости, которые еще не отправлены
+        # Get hot news that haven't been sent yet
         hot_news = self.get_hot_news()
         
         for news in hot_news:
             if news['id'] in self.notified_news:
                 continue
             
-            print(f"🔥 Отправляем уведомление о горячей новости: {news['headline'][:50]}...")
+            print(f"🔥 Sending hot news notification: {news['headline'][:50]}...")
             
             try:
-                # Генерируем полный анализ
+                # Generate full analysis
                 analysis = self.analyzer.generate_full_analysis({
                     'headline': news['headline'],
                     'content': news['content'],
@@ -54,13 +54,13 @@ class HotNewsMonitor:
                     'hotness': news['ai_hotness'],
                     'urls': news.get('urls', []),
                     'published_at': news.get('published_time', ''),
-                    'source': news.get('source', 'Неизвестный источник')
+                    'source': news.get('source', 'Unknown source')
                 })
                 
-                # Форматируем сообщение
+                # Format message
                 message = self.format_hot_news_alert(news, analysis)
                 
-                # Отправляем
+                # Send
                 await self.bot.send_message(
                     chat_id=self.chat_id,
                     text=message,
@@ -68,19 +68,19 @@ class HotNewsMonitor:
                     disable_web_page_preview=True
                 )
                 
-                # Помечаем как отправленное
+                # Mark as sent
                 self.notified_news.add(news['id'])
                 
-                print(f"✅ Уведомление отправлено")
+                print(f"✅ Notification sent")
                 
-                # Небольшая задержка между сообщениями
+                # Small delay between messages
                 await asyncio.sleep(2)
                 
             except Exception as e:
-                print(f"❌ Ошибка отправки уведомления: {e}")
+                print(f"❌ Notification send error: {e}")
     
     def get_hot_news(self):
-        """Получить необработанные горячие новости"""
+        """Get unprocessed hot news"""
         with get_db_cursor() as cursor:
             cursor.execute("""
                 SELECT 
@@ -119,35 +119,35 @@ class HotNewsMonitor:
             return news_list
     
     def format_hot_news_alert(self, news: dict, analysis: dict) -> str:
-        """Форматирование алерта о горячей новости"""
+        """Format hot news alert"""
         hotness = news['ai_hotness']
         
-        # Получаем timeline для контекста
+        # Get timeline for context
         first_time = news.get('first_time')
         last_time = news.get('last_time')
-        timeline = f"Первое: {first_time.strftime('%d.%m %H:%M')}"
+        timeline = f"First: {first_time.strftime('%d.%m %H:%M')}"
         if first_time and last_time and first_time != last_time:
-            timeline += f" | Последнее: {last_time.strftime('%d.%m %H:%M')}"
+            timeline += f" | Last: {last_time.strftime('%d.%m %H:%M')}"
         
-        # Формируем заголовок алерта + готовая аналитическая карточка
-        header = f"""🚨 *ГОРЯЧАЯ НОВОСТЬ!*
+        # Form alert header + ready analytical card
+        header = f"""🚨 *HOT NEWS!*
 🔥 *Hotness: {hotness:.2f}/1.00*
-📄 *Документов в кластере:* {news.get('doc_count', 1)}
+📄 *Documents in cluster:* {news.get('doc_count', 1)}
 ⏰ *Timeline:* {timeline}
 
 {'='*40}
 """
         
-        # Добавляем готовую аналитическую карточку
-        analysis_card = analysis.get('analysis_text', 'Анализ недоступен')
+        # Add ready analytical card
+        analysis_card = analysis.get('analysis_text', 'Analysis unavailable')
         
         return header + analysis_card
     
     async def run(self):
-        """Запуск мониторинга в цикле"""
-        print(f"🔍 Монитор горячих новостей запущен")
-        print(f"   Порог hotness: {self.hotness_threshold}")
-        print(f"   Интервал проверки: {self.check_interval}с")
+        """Run monitoring in loop"""
+        print(f"🔍 Hot news monitor started")
+        print(f"   Hotness threshold: {self.hotness_threshold}")
+        print(f"   Check interval: {self.check_interval}s")
         print(f"   Chat ID: {self.chat_id}")
         
         while True:
@@ -155,10 +155,10 @@ class HotNewsMonitor:
                 await self.check_and_notify()
                 await asyncio.sleep(self.check_interval)
             except KeyboardInterrupt:
-                print("\n🛑 Остановка монитора...")
+                print("\n🛑 Stopping monitor...")
                 break
             except Exception as e:
-                print(f"❌ Ошибка в мониторе: {e}")
+                print(f"❌ Monitor error: {e}")
                 await asyncio.sleep(self.check_interval)
 
 

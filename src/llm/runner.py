@@ -1,11 +1,11 @@
-"""CLI для запуска LLM анализа новостных кластеров"""
+"""CLI for running LLM analysis of news clusters"""
 import argparse
 import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Загружаем .env файл из корня проекта
+# Load .env file from project root
 project_root = Path(__file__).parent.parent.parent
 load_dotenv(project_root / '.env')
 
@@ -17,54 +17,54 @@ from src.llm.processor import LLMNewsProcessor
 
 def main():
     parser = argparse.ArgumentParser(
-        description='LLM анализ новостных кластеров',
+        description='LLM analysis of news clusters',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Примеры использования:
-  # Обработать 10 кластеров на GPT-3.5-turbo
+Usage examples:
+  # Process 10 clusters on GPT-3.5-turbo
   python -m src.llm.runner --limit 10
   
-  # Обработать 5 кластеров на Claude
+  # Process 5 clusters on Claude
   python -m src.llm.runner --limit 5 --model anthropic/claude-3-haiku
   
-  # Показать топ горячих новостей
+  # Show top hot news
   python -m src.llm.runner --show-top 10
   
-  # Обработать все необработанные
+  # Process all unprocessed
   python -m src.llm.runner --limit 100
         """
     )
     
     parser.add_argument('--limit', type=int, default=10,
-                        help='Количество кластеров для обработки (default: 10)')
+                        help='Number of clusters to process (default: 10)')
     parser.add_argument('--model', default=None,
-                        help='Модель для использования (default: из LLM_MODEL или deepseek/deepseek-chat)')
+                        help='Model to use (default: from LLM_MODEL or deepseek/deepseek-chat)')
     parser.add_argument('--delay', type=float, default=float(os.getenv('LLM_DELAY', '1.0')),
-                        help='Задержка между запросами в секундах (default: из LLM_DELAY или 1.0)')
+                        help='Delay between requests in seconds (default: from LLM_DELAY or 1.0)')
     parser.add_argument('--api-key', 
-                        help='OpenRouter API ключ (или используйте OPENROUTER_API_KEY)')
+                        help='OpenRouter API key (or use OPENROUTER_API_KEY)')
     parser.add_argument('--show-top', type=int, metavar='N',
-                        help='Показать топ N самых горячих новостей')
+                        help='Show top N hottest news')
     parser.add_argument('--min-hotness', type=float, default=0.7,
-                        help='Минимальная горячность для топа (default: 0.7)')
+                        help='Minimum hotness for top (default: 0.7)')
     
     args = parser.parse_args()
     
-    # Проверяем API ключ
+    # Check API key
     api_key = args.api_key or os.getenv('OPENROUTER_API_KEY')
     if not api_key and not args.show_top:
-        print("❌ Ошибка: установите OPENROUTER_API_KEY или используйте --api-key")
-        print("\nПример:")
+        print("❌ Error: set OPENROUTER_API_KEY or use --api-key")
+        print("\nExample:")
         print("  export OPENROUTER_API_KEY='your-key-here'")
         print("  python -m src.llm.runner --limit 5")
         sys.exit(1)
     
-    # Подключаемся к БД
+    # Connect to DB
     db_conn = get_db_connection()
     db_conn.connect()
     
     try:
-        # Создаем процессор
+        # Create processor
         processor = LLMNewsProcessor(
             conn=db_conn._connection,
             api_key=api_key,
@@ -72,9 +72,9 @@ def main():
         )
         
         if args.show_top:
-            # Показываем топ горячих новостей
+            # Show top hot news
             print(f"\n{'='*60}")
-            print(f"🔥 ТОП-{args.show_top} САМЫХ ГОРЯЧИХ НОВОСТЕЙ")
+            print(f"🔥 TOP {args.show_top} HOTTEST NEWS")
             print(f"{'='*60}\n")
             
             hot_news = processor.get_top_hot_news(
@@ -83,7 +83,7 @@ def main():
             )
             
             if not hot_news:
-                print("📭 Нет новостей с требуемой горячностью")
+                print("📭 No news with required hotness")
             else:
                 for i, news in enumerate(hot_news, 1):
                     print(f"{i}. {news['headline'][:70]}...")
@@ -93,13 +93,13 @@ def main():
                     print(f"   🔗 URLs: {len(news['urls'])}")
                     print()
         else:
-            # Обрабатываем кластеры
+            # Process clusters
             print(f"\n{'='*60}")
-            print(f"🤖 LLM АНАЛИЗ НОВОСТНЫХ КЛАСТЕРОВ")
+            print(f"🤖 LLM NEWS CLUSTER ANALYSIS")
             print(f"{'='*60}")
-            print(f"🎯 Модель: {args.model}")
-            print(f"📊 Лимит: {args.limit}")
-            print(f"⏱️  Задержка: {args.delay}с")
+            print(f"🎯 Model: {args.model}")
+            print(f"📊 Limit: {args.limit}")
+            print(f"⏱️  Delay: {args.delay}s")
             print(f"{'='*60}\n")
             
             stats = processor.process_batch(
@@ -107,7 +107,7 @@ def main():
                 delay=args.delay
             )
             
-            print(f"\n✅ Обработка завершена!")
+            print(f"\n✅ Processing complete!")
             
     finally:
         db_conn.close()

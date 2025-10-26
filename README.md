@@ -149,10 +149,10 @@ docker-compose logs -f
 ```
 
 **Запущенные сервисы:**
-- `parser` - парсинг RSS и Telegram каналов (каждые 5 минут)
 - `pipeline` - обработка новостей (нормализация → дедупликация → LLM)
 - `telegram_bot` - Telegram бот с автоуведомлениями
-- `frontend` - веб-интерфейс для просмотра новостей
+
+**Примечание:** Парсер новостей (`parser_worker.py`) запускается из отдельного контейнера на сервере и не включен в основной docker-compose.yml.
 
 ### Управление контейнерами:
 
@@ -164,19 +164,20 @@ docker-compose down
 docker-compose restart
 
 # Логи конкретного сервиса
-docker-compose logs -f parser
 docker-compose logs -f pipeline
 docker-compose logs -f telegram_bot
-docker-compose logs -f frontend
 
-# Запустить только парсер
-docker-compose up parser -d
-
-# Запустить только обработку
+# Запустить только pipeline
 docker-compose up pipeline -d
 
-# Запустить только веб-интерфейс
-docker-compose up frontend -d
+# Запустить только telegram_bot
+docker-compose up telegram_bot -d
+
+# Статус контейнеров
+docker-compose ps
+
+# Проверка здоровья
+docker-compose ps | grep healthy
 ```
 
 ---
@@ -186,7 +187,7 @@ docker-compose up frontend -d
 ### Пайплайн обработки:
 
 ```
-[0] Парсер → financial_news_view (RSS + Telegram)
+[0] Парсер (внешний контейнер) → financial_news_view (RSS + Telegram)
     ↓
 [1] Нормализация → normalized_articles
     ↓
@@ -196,6 +197,8 @@ docker-compose up frontend -d
     ↓
 [4] Telegram бот → уведомления подписчикам
 ```
+
+**Примечание:** Этапы [1-3] выполняются в контейнере `pipeline`, этап [4] - в контейнере `telegram_bot`. Парсер [0] запускается из отдельного контейнера на сервере.
 
 ### Таблицы БД:
 

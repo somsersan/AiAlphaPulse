@@ -1,4 +1,4 @@
-"""Telegram бот для отправки новостей"""
+"""Telegram bot for sending news"""
 import os
 import json
 import asyncio
@@ -26,24 +26,24 @@ load_dotenv()
 
 
 class NewsBot:
-    """Telegram бот для новостей"""
+    """Telegram bot for news"""
     
     def __init__(self, enable_monitor: bool = True, hotness_threshold: float = 0.7, check_interval: int = 60):
         self.token = os.getenv('TELEGRAM_BOT_TOKEN')
         if not self.token:
-            raise ValueError("TELEGRAM_BOT_TOKEN не установлен в .env")
+            raise ValueError("TELEGRAM_BOT_TOKEN not set in .env")
         
-        # TELEGRAM_CHAT_ID теперь не обязателен - используем подписчиков из БД
-        self.legacy_chat_id = os.getenv('TELEGRAM_CHAT_ID')  # Для обратной совместимости
+        # TELEGRAM_CHAT_ID is now optional - using subscribers from DB
+        self.legacy_chat_id = os.getenv('TELEGRAM_CHAT_ID')  # For backward compatibility
         
         self.analyzer = NewsAnalyzer()
         self.app = Application.builder().token(self.token).build()
         
-        # Настройка таймаутов для избежания ошибок подключения
+        # Configure timeouts to avoid connection errors
         self.app.bot.request.timeout = 30
         self.app.bot.request.connect_timeout = 10
         
-        # Регистрируем команды
+        # Register commands
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CommandHandler("top", self.top_command))
@@ -53,101 +53,101 @@ class NewsBot:
         self.app.add_handler(CommandHandler("mystatus", self.mystatus_command))
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
         
-        # Инициализируем таблицу подписчиков
+        # Initialize subscribers table
         self._init_subscribers_table()
         
-        # Настройки монитора горячих новостей
+        # Hot news monitor settings
         self.enable_monitor = enable_monitor
         self.hotness_threshold = hotness_threshold
         self.check_interval = check_interval
         self.notified_news: Set[int] = set()
     
     def _init_subscribers_table(self):
-        """Инициализировать таблицу подписчиков"""
+        """Initialize subscribers table"""
         try:
             db_conn = get_db_connection()
             db_conn.connect()
             create_subscribers_table(db_conn._connection)
             
-            # Если есть legacy TELEGRAM_CHAT_ID, добавим его как подписчика
+            # If legacy TELEGRAM_CHAT_ID exists, add it as subscriber
             if self.legacy_chat_id:
                 try:
                     chat_id = int(self.legacy_chat_id)
                     add_subscriber(db_conn._connection, chat_id, username="legacy_user")
-                    print(f"✅ Legacy chat_id {chat_id} добавлен в подписчики")
+                    print(f"✅ Legacy chat_id {chat_id} added to subscribers")
                 except:
                     pass
             
             db_conn.close()
         except Exception as e:
-            print(f"⚠️ Ошибка инициализации таблицы подписчиков: {e}")
+            print(f"⚠️ Error initializing subscribers table: {e}")
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /start"""
+        """Command /start"""
         welcome_message = """
-🔥 <b>Добро пожаловать в AiAlphaPulse!</b>
+🔥 <b>Welcome to AI Alpha Pulse!</b>
 
-Я помогу отслеживать самые горячие финансовые новости.
+I'll help you track the hottest financial news.
 
-📊 <b>Доступные команды:</b>
-/top - Топ новостей по hotness
-/latest - Последние добавленные новости
-/subscribe - Подписаться на уведомления
-/unsubscribe - Отписаться от уведомлений
-/mystatus - Проверить статус подписки
-/help - Справка
+📊 <b>Available commands:</b>
+/top - Top news by hotness
+/latest - Latest added news
+/subscribe - Subscribe to notifications
+/unsubscribe - Unsubscribe from notifications
+/mystatus - Check subscription status
+/help - Help
 
-📌 <b>Примеры:</b>
-<code>/top 10 24</code> - Топ-10 за 24 часа
-<code>/top 5 48</code> - Топ-5 за 48 часов
-<code>/latest 5</code> - Последние 5 новостей
-<code>/latest</code> - Последние 10 новостей
+📌 <b>Examples:</b>
+<code>/top 10 24</code> - Top 10 for 24 hours
+<code>/top 5 48</code> - Top 5 for 48 hours
+<code>/latest 5</code> - Latest 5 news
+<code>/latest</code> - Latest 10 news
 
-🔔 <b>Автоуведомления:</b>
-Подпишитесь командой /subscribe чтобы получать горячие новости (hotness ≥ 0.7) автоматически!
+🔔 <b>Auto-notifications:</b>
+Subscribe with /subscribe to receive hot news (hotness ≥ 0.7) automatically!
         """
         await update.message.reply_text(welcome_message, parse_mode=ParseMode.HTML)
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /help"""
+        """Command /help"""
         help_text = """
-📖 <b>Справка по командам</b>
+📖 <b>Command Help</b>
 
-<b>1️⃣ Топ по hotness:</b>
-<code>/top [количество] [часы]</code>
-• количество - сколько новостей (1-20, default: 10)
-• часы - за какой период (1-168, default: 24)
+<b>1️⃣ Top by hotness:</b>
+<code>/top [count] [hours]</code>
+• count - how many news items (1-20, default: 10)
+• hours - time period (1-168, default: 24)
 
-<b>Примеры:</b>
-<code>/top</code> - Топ-10 за последние 24 часа
-<code>/top 5</code> - Топ-5 за последние 24 часа  
-<code>/top 15 48</code> - Топ-15 за последние 48 часов
+<b>Examples:</b>
+<code>/top</code> - Top 10 for last 24 hours
+<code>/top 5</code> - Top 5 for last 24 hours  
+<code>/top 15 48</code> - Top 15 for last 48 hours
 
-<b>2️⃣ Последние новости:</b>
-<code>/latest [количество]</code>
-• количество - сколько новостей (1-20, default: 10)
+<b>2️⃣ Latest news:</b>
+<code>/latest [count]</code>
+• count - how many news items (1-20, default: 10)
 
-<b>Примеры:</b>
-<code>/latest</code> - Последние 10 новостей
-<code>/latest 5</code> - Последние 5 новостей
-<code>/latest 20</code> - Последние 20 новостей
+<b>Examples:</b>
+<code>/latest</code> - Latest 10 news
+<code>/latest 5</code> - Latest 5 news
+<code>/latest 20</code> - Latest 20 news
 
-📊 <b>Что показывается:</b>
-• Заголовок новости
-• Оценка горячести (0-1)
-• Тикеры/активы
-• Ссылки на источники
-• Время публикации
-• Кнопка для детального анализа
+📊 <b>What's shown:</b>
+• News headline
+• Hotness score (0-1)
+• Tickers/assets
+• Source links
+• Publication time
+• Button for detailed analysis
 
-🔥 <b>Для особо горячих новостей</b> (≥0.7):
-• Торговый сигнал
-• Рекомендации по активам
+🔥 <b>For hot news</b> (≥0.7):
+• Trading signal
+• Asset recommendations
         """
         await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
     
     async def subscribe_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /subscribe - подписаться на уведомления"""
+        """Command /subscribe - subscribe to notifications"""
         chat_id = update.effective_chat.id
         user = update.effective_user
         
@@ -155,15 +155,15 @@ class NewsBot:
             db_conn = get_db_connection()
             db_conn.connect()
             
-            # Проверяем, уже подписан ли
+            # Check if already subscribed
             if is_subscribed(db_conn._connection, chat_id):
                 await update.message.reply_text(
-                    "✅ Вы уже подписаны на уведомления о горячих новостях!"
+                    "✅ You are already subscribed to hot news notifications!"
                 )
                 db_conn.close()
                 return
             
-            # Добавляем подписчика
+            # Add subscriber
             success = add_subscriber(
                 db_conn._connection,
                 chat_id=chat_id,
@@ -176,64 +176,64 @@ class NewsBot:
             
             if success:
                 await update.message.reply_text(
-                    "🔔 <b>Подписка активирована!</b>\n\n"
-                    "Теперь вы будете получать уведомления о горячих новостях (hotness ≥ 0.7).\n\n"
-                    "Для отписки используйте /unsubscribe",
+                    "🔔 <b>Subscription activated!</b>\n\n"
+                    "You will now receive notifications about hot news (hotness ≥ 0.7).\n\n"
+                    "To unsubscribe use /unsubscribe",
                     parse_mode=ParseMode.HTML
                 )
             else:
                 await update.message.reply_text(
-                    "❌ Ошибка подписки. Попробуйте позже."
+                    "❌ Subscription error. Please try later."
                 )
                 
         except Exception as e:
-            print(f"❌ Ошибка подписки: {e}")
+            print(f"❌ Subscription error: {e}")
             await update.message.reply_text(
-                "❌ Произошла ошибка. Попробуйте позже."
+                "❌ An error occurred. Please try later."
             )
     
     async def unsubscribe_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /unsubscribe - отписаться от уведомлений"""
+        """Command /unsubscribe - unsubscribe from notifications"""
         chat_id = update.effective_chat.id
         
         try:
             db_conn = get_db_connection()
             db_conn.connect()
             
-            # Проверяем, подписан ли
+            # Check if subscribed
             if not is_subscribed(db_conn._connection, chat_id):
                 await update.message.reply_text(
-                    "ℹ️ Вы не подписаны на уведомления.\n\n"
-                    "Для подписки используйте /subscribe"
+                    "ℹ️ You are not subscribed to notifications.\n\n"
+                    "To subscribe use /subscribe"
                 )
                 db_conn.close()
                 return
             
-            # Отписываем
+            # Unsubscribe
             success = remove_subscriber(db_conn._connection, chat_id)
             
             db_conn.close()
             
             if success:
                 await update.message.reply_text(
-                    "🔕 <b>Подписка отключена</b>\n\n"
-                    "Вы больше не будете получать автоматические уведомления.\n\n"
-                    "Для возобновления используйте /subscribe",
+                    "🔕 <b>Subscription disabled</b>\n\n"
+                    "You will no longer receive automatic notifications.\n\n"
+                    "To re-subscribe use /subscribe",
                     parse_mode=ParseMode.HTML
                 )
             else:
                 await update.message.reply_text(
-                    "❌ Ошибка отписки. Попробуйте позже."
+                    "❌ Unsubscribe error. Please try later."
                 )
                 
         except Exception as e:
-            print(f"❌ Ошибка отписки: {e}")
+            print(f"❌ Unsubscribe error: {e}")
             await update.message.reply_text(
-                "❌ Произошла ошибка. Попробуйте позже."
+                "❌ An error occurred. Please try later."
             )
     
     async def mystatus_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /mystatus - проверить статус подписки"""
+        """Command /mystatus - check subscription status"""
         chat_id = update.effective_chat.id
         
         try:
@@ -247,36 +247,36 @@ class NewsBot:
             
             if subscribed:
                 status_message = f"""
-✅ <b>Ваш статус: Подписан</b>
+✅ <b>Your status: Subscribed</b>
 
-🔔 Вы получаете автоматические уведомления о горячих новостях (hotness ≥ {self.hotness_threshold}).
+🔔 You receive automatic notifications about hot news (hotness ≥ {self.hotness_threshold}).
 
-📊 <b>Настройки уведомлений:</b>
-• Порог hotness: {self.hotness_threshold}
-• Интервал проверки: {self.check_interval}с
+📊 <b>Notification settings:</b>
+• Hotness threshold: {self.hotness_threshold}
+• Check interval: {self.check_interval}s
 
-Для отписки: /unsubscribe
+To unsubscribe: /unsubscribe
                 """
             else:
                 status_message = f"""
-🔕 <b>Ваш статус: Не подписан</b>
+🔕 <b>Your status: Not subscribed</b>
 
-Вы не получаете автоматические уведомления.
+You are not receiving automatic notifications.
 
-Для подписки: /subscribe
+To subscribe: /subscribe
                 """
             
             await update.message.reply_text(status_message.strip(), parse_mode=ParseMode.HTML)
             
         except Exception as e:
-            print(f"❌ Ошибка проверки статуса: {e}")
+            print(f"❌ Status check error: {e}")
             await update.message.reply_text(
-                "❌ Произошла ошибка. Попробуйте позже."
+                "❌ An error occurred. Please try later."
             )
     
     async def top_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /top [limit] [hours]"""
-        # Парсим аргументы
+        """Command /top [limit] [hours]"""
+        # Parse arguments
         args = context.args
         limit = 10
         hours = 24
@@ -288,31 +288,31 @@ class NewsBot:
                 hours = min(max(int(args[1]), 1), 168)
         except ValueError:
             await update.message.reply_text(
-                "❌ Неверный формат. Используйте: /top [количество] [часы]"
+                "❌ Invalid format. Use: /top [count] [hours]"
             )
             return
         
         await update.message.reply_text(
-            f"🔍 Получаю топ-{limit} новостей за последние {hours}ч..."
+            f"🔍 Fetching top {limit} news for last {hours}h..."
         )
         
-        # Получаем новости из БД
+        # Get news from DB
         news_list = self.get_top_news(limit, hours)
         
         if not news_list:
             await update.message.reply_text(
-                f"📭 Нет новостей за последние {hours} часов"
+                f"📭 No news for the last {hours} hours"
             )
             return
         
-        # Отправляем каждую новость
+        # Send each news item
         for i, news in enumerate(news_list, 1):
             message = self.format_news_message(news, i, len(news_list))
             
-            # Добавляем кнопку для детального анализа
+            # Add button for detailed analysis
             keyboard = [[
                 InlineKeyboardButton(
-                    "📊 Детальный анализ", 
+                    "📊 Detailed Analysis", 
                     callback_data=f"analyze_{news['id']}"
                 )
             ]]
@@ -326,8 +326,8 @@ class NewsBot:
             )
     
     async def latest_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /latest [limit] - последние добавленные новости"""
-        # Парсим аргументы
+        """Command /latest [limit] - latest added news"""
+        # Parse arguments
         args = context.args
         limit = 10
         
@@ -336,31 +336,31 @@ class NewsBot:
                 limit = min(max(int(args[0]), 1), 20)
         except ValueError:
             await update.message.reply_text(
-                "❌ Неверный формат. Используйте: /latest [количество]"
+                "❌ Invalid format. Use: /latest [count]"
             )
             return
         
         await update.message.reply_text(
-            f"🔍 Получаю последние {limit} новостей..."
+            f"🔍 Fetching latest {limit} news..."
         )
         
-        # Получаем новости из БД
+        # Get news from DB
         news_list = self.get_latest_news(limit)
         
         if not news_list:
             await update.message.reply_text(
-                "📭 Нет новостей в базе данных"
+                "📭 No news in database"
             )
             return
         
-        # Отправляем каждую новость
+        # Send each news item
         for i, news in enumerate(news_list, 1):
             message = self.format_latest_news_message(news, i, len(news_list))
             
-            # Добавляем кнопку для детального анализа
+            # Add button for detailed analysis
             keyboard = [[
                 InlineKeyboardButton(
-                    "📊 Детальный анализ", 
+                    "📊 Detailed Analysis", 
                     callback_data=f"analyze_{news['id']}"
                 )
             ]]
@@ -374,22 +374,22 @@ class NewsBot:
             )
     
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка нажатий на кнопки"""
+        """Handle button presses"""
         query = update.callback_query
         await query.answer()
         
         if query.data.startswith("analyze_"):
             news_id = int(query.data.split("_")[1])
             
-            await query.edit_message_text("⏳ Генерирую детальный анализ...")
+            await query.edit_message_text("⏳ Generating detailed analysis...")
             
-            # Получаем новость из БД
+            # Get news from DB
             news = self.get_news_by_id(news_id)
             if not news:
-                await query.edit_message_text("❌ Новость не найдена")
+                await query.edit_message_text("❌ News not found")
                 return
             
-            # Генерируем анализ через LLM
+            # Generate analysis via LLM
             analysis = self.analyzer.generate_full_analysis({
                 'headline': news['headline'],
                 'content': news['content'],
@@ -397,18 +397,18 @@ class NewsBot:
                 'hotness': news['ai_hotness'],
                 'urls': news.get('urls', []),
                 'published_at': news.get('published_time', ''),
-                'source': news.get('source', 'Неизвестный источник')
+                'source': news.get('source', 'Unknown source')
             })
             
-            # Форматируем и отправляем (теперь analysis содержит готовую карточку)
+            # Format and send (analysis now contains ready card)
             await query.edit_message_text(
-                analysis.get('analysis_text', 'Анализ недоступен'),
+                analysis.get('analysis_text', 'Analysis unavailable'),
                 parse_mode=ParseMode.MARKDOWN,
                 disable_web_page_preview=True
             )
     
     def get_top_news(self, limit: int, hours: int) -> List[Dict]:
-        """Получить топ новостей из БД"""
+        """Get top news from DB"""
         time_threshold = datetime.now() - timedelta(hours=hours)
         
         with get_db_cursor() as cursor:
@@ -450,7 +450,7 @@ class NewsBot:
             return news_list
     
     def get_latest_news(self, limit: int) -> List[Dict]:
-        """Получить последние добавленные новости из БД (по created_at)"""
+        """Get latest added news from DB (by created_at)"""
         with get_db_cursor() as cursor:
             cursor.execute("""
                 SELECT 
@@ -491,7 +491,7 @@ class NewsBot:
             return news_list
     
     def get_news_by_id(self, news_id: int) -> Dict:
-        """Получить новость по ID"""
+        """Get news by ID"""
         with get_db_cursor() as cursor:
             cursor.execute("""
                 SELECT 
@@ -520,23 +520,23 @@ class NewsBot:
             }
     
     def format_news_message(self, news: Dict, index: int, total: int) -> str:
-        """Форматирование сообщения с новостью"""
+        """Format news message"""
         hotness = news['ai_hotness']
         hotness_emoji = self._get_hotness_emoji(hotness)
         
-        # Экранируем для HTML
+        # Escape for HTML
         headline_escaped = escape(news['headline'])
         
-        # Тикеры
+        # Tickers
         tickers_list = news.get('tickers', [])
         tickers_str = escape(', '.join(tickers_list)) if tickers_list else '—'
         
-        # Ссылки (макс 3)
+        # Links (max 3)
         urls = news.get('urls', [])[:3]
         if urls:
             sources_list = []
             for url in urls:
-                # Ограничиваем длину URL для отображения
+                # Limit URL length for display
                 display_url = url if len(url) < 50 else url[:47] + '...'
                 sources_list.append(f'• <a href="{url}">{escape(display_url)}</a>')
             sources_str = '\n'.join(sources_list)
@@ -546,41 +546,41 @@ class NewsBot:
         # Timeline
         first_time = news.get('first_time')
         last_time = news.get('last_time')
-        timeline = f"Первое упоминание: {first_time.strftime('%d.%m %H:%M')}"
+        timeline = f"First mention: {first_time.strftime('%d.%m %H:%M')}"
         if first_time != last_time:
-            timeline += f"\nПоследнее: {last_time.strftime('%d.%m %H:%M')}"
+            timeline += f"\nLast: {last_time.strftime('%d.%m %H:%M')}"
         
         message = f"""
-{hotness_emoji} <b>#{index}/{total} Новость</b>
+{hotness_emoji} <b>#{index}/{total} News</b>
 
 <b>{headline_escaped}</b>
 
 🔥 <b>Hotness:</b> {hotness:.2f}/1.00
-📊 <b>Тикеры:</b> {tickers_str}
-📄 <b>Документов:</b> {news.get('doc_count', 1)}
+📊 <b>Tickers:</b> {tickers_str}
+📄 <b>Documents:</b> {news.get('doc_count', 1)}
 
 ⏰ <b>Timeline:</b>
 {timeline}
 
-🔗 <b>Источники:</b>
+🔗 <b>Sources:</b>
 {sources_str}
         """.strip()
         
         return message
     
     def format_latest_news_message(self, news: Dict, index: int, total: int) -> str:
-        """Форматирование сообщения для последних новостей"""
+        """Format message for latest news"""
         hotness = news['ai_hotness']
         hotness_emoji = self._get_hotness_emoji(hotness)
         
-        # Экранируем для HTML
+        # Escape for HTML
         headline_escaped = escape(news['headline'])
         
-        # Тикеры
+        # Tickers
         tickers_list = news.get('tickers', [])
         tickers_str = escape(', '.join(tickers_list)) if tickers_list else '—'
         
-        # Ссылки (макс 3)
+        # Links (max 3)
         urls = news.get('urls', [])[:3]
         if urls:
             sources_list = []
@@ -591,39 +591,39 @@ class NewsBot:
         else:
             sources_str = '—'
         
-        # Время добавления в систему
+        # Time added to system
         created_at = news.get('created_at')
         created_str = created_at.strftime('%d.%m.%Y %H:%M') if created_at else '—'
         
-        # Время публикации оригинала
+        # Original publication time
         published_time = news.get('published_time')
         published_str = published_time.strftime('%d.%m.%Y %H:%M') if published_time else '—'
         
         message = f"""
-{hotness_emoji} <b>#{index}/{total} Новость</b>
+{hotness_emoji} <b>#{index}/{total} News</b>
 
 <b>{headline_escaped}</b>
 
 🔥 <b>Hotness:</b> {hotness:.2f}/1.00
-📊 <b>Тикеры:</b> {tickers_str}
-📄 <b>Документов:</b> {news.get('doc_count', 1)}
+📊 <b>Tickers:</b> {tickers_str}
+📄 <b>Documents:</b> {news.get('doc_count', 1)}
 
-⏰ <b>Добавлено в систему:</b> {created_str}
-📅 <b>Опубликовано:</b> {published_str}
+⏰ <b>Added to system:</b> {created_str}
+📅 <b>Published:</b> {published_str}
 
-🔗 <b>Источники:</b>
+🔗 <b>Sources:</b>
 {sources_str}
         """.strip()
         
         return message
     
     def format_detailed_analysis(self, news: Dict, analysis: Dict) -> str:
-        """Форматирование детального анализа (теперь возвращает готовую карточку)"""
-        # analysis уже содержит готовую карточку в формате Markdown
-        return analysis.get('analysis_text', 'Анализ недоступен')
+        """Format detailed analysis (now returns ready card)"""
+        # analysis already contains ready card in Markdown format
+        return analysis.get('analysis_text', 'Analysis unavailable')
     
     def _get_hotness_emoji(self, hotness: float) -> str:
-        """Эмодзи в зависимости от горячности"""
+        """Emoji based on hotness"""
         if hotness >= 0.8:
             return "🔴🔥"
         elif hotness >= 0.6:
@@ -634,35 +634,35 @@ class NewsBot:
             return "🟢"
     
     async def monitor_hot_news(self):
-        """Фоновая задача мониторинга горячих новостей"""
-        print(f"🔍 Монитор горячих новостей запущен (порог: {self.hotness_threshold})")
+        """Background task for monitoring hot news"""
+        print(f"🔍 Hot news monitor started (threshold: {self.hotness_threshold})")
         
         while True:
             try:
-                # Получаем список активных подписчиков
+                # Get list of active subscribers
                 db_conn = get_db_connection()
                 db_conn.connect()
                 subscribers = get_active_subscribers(db_conn._connection)
                 db_conn.close()
                 
                 if not subscribers:
-                    print("ℹ️ Нет активных подписчиков")
+                    print("ℹ️ No active subscribers")
                     await asyncio.sleep(self.check_interval)
                     continue
                 
-                print(f"📊 Активных подписчиков: {len(subscribers)}")
+                print(f"📊 Active subscribers: {len(subscribers)}")
                 
-                # Получаем горячие новости
+                # Get hot news
                 hot_news = self.get_hot_news_for_monitor()
                 
                 for news in hot_news:
                     if news['id'] in self.notified_news:
                         continue
                     
-                    print(f"🔥 Отправляем уведомление: {news['headline'][:50]}...")
+                    print(f"🔥 Sending notification: {news['headline'][:50]}...")
                     
                     try:
-                        # Генерируем анализ один раз для всех подписчиков
+                        # Generate analysis once for all subscribers
                         analysis = self.analyzer.generate_full_analysis({
                             'headline': news['headline'],
                             'content': news['content'],
@@ -670,13 +670,13 @@ class NewsBot:
                             'hotness': news['ai_hotness'],
                             'urls': news.get('urls', []),
                             'published_at': news.get('published_time', ''),
-                            'source': news.get('source', 'Неизвестный источник')
+                            'source': news.get('source', 'Unknown source')
                         })
                         
-                        # Форматируем сообщение (добавляем заголовок алерта)
+                        # Format message (add alert header)
                         message = self.format_hot_news_alert(news, analysis)
                         
-                        # Отправляем всем подписчикам
+                        # Send to all subscribers
                         sent_count = 0
                         failed_count = 0
                         
@@ -690,37 +690,37 @@ class NewsBot:
                                 )
                                 sent_count += 1
                                 
-                                # Обновляем время последнего уведомления
+                                # Update last notification time
                                 db_conn = get_db_connection()
                                 db_conn.connect()
                                 update_last_notification(db_conn._connection, chat_id)
                                 db_conn.close()
                                 
-                                await asyncio.sleep(0.1)  # Небольшая задержка между отправками
+                                await asyncio.sleep(0.1)  # Small delay between sends
                                 
                             except Exception as e:
-                                print(f"  ❌ Ошибка отправки chat_id {chat_id}: {e}")
+                                print(f"  ❌ Send error chat_id {chat_id}: {e}")
                                 failed_count += 1
                         
                         self.notified_news.add(news['id'])
-                        print(f"  ✅ Отправлено: {sent_count}, Ошибок: {failed_count}")
+                        print(f"  ✅ Sent: {sent_count}, Errors: {failed_count}")
                         
                         await asyncio.sleep(2)
                         
                     except Exception as e:
-                        print(f"❌ Ошибка обработки новости: {e}")
+                        print(f"❌ News processing error: {e}")
                 
                 await asyncio.sleep(self.check_interval)
                 
             except Exception as e:
-                print(f"❌ Ошибка в мониторе: {e}")
+                print(f"❌ Monitor error: {e}")
                 await asyncio.sleep(self.check_interval)
     
     def get_hot_news_for_monitor(self):
-        """Получить только НОВЫЕ горячие новости (созданные за последний check_interval * 2)"""
+        """Get only NEW hot news (created in last check_interval * 2)"""
         with get_db_cursor() as cursor:
-            # Ищем новости, созданные за последние 2 интервала проверки (для надёжности)
-            # Это гарантирует, что мы не пропустим новости и не будем слать повторы
+            # Look for news created in last 2 check intervals (for reliability)
+            # This ensures we don't miss news and don't send duplicates
             cursor.execute("""
                 SELECT 
                     lan.id,
@@ -760,42 +760,42 @@ class NewsBot:
             return news_list
     
     def format_hot_news_alert(self, news: dict, analysis: dict) -> str:
-        """Форматирование алерта о горячей новости"""
+        """Format hot news alert"""
         hotness = news['ai_hotness']
         
-        # Получаем timeline для контекста
+        # Get timeline for context
         first_time = news.get('first_time')
         last_time = news.get('last_time')
-        timeline = f"Первое: {first_time.strftime('%d.%m %H:%M')}"
+        timeline = f"First: {first_time.strftime('%d.%m %H:%M')}"
         if first_time and last_time and first_time != last_time:
-            timeline += f" | Последнее: {last_time.strftime('%d.%m %H:%M')}"
+            timeline += f" | Last: {last_time.strftime('%d.%m %H:%M')}"
         
-        # Формируем заголовок алерта + готовая аналитическая карточка
-        header = f"""🚨 *ГОРЯЧАЯ НОВОСТЬ!*
+        # Form alert header + ready analytical card
+        header = f"""🚨 *HOT NEWS!*
 🔥 *Hotness: {hotness:.2f}/1.00*
-📄 *Документов в кластере:* {news.get('doc_count', 1)}
+📄 *Documents in cluster:* {news.get('doc_count', 1)}
 ⏰ *Timeline:* {timeline}
 
 {'='*40}
 """
         
-        # Добавляем готовую аналитическую карточку
-        analysis_card = analysis.get('analysis_text', 'Анализ недоступен')
+        # Add ready analytical card
+        analysis_card = analysis.get('analysis_text', 'Analysis unavailable')
         
         return header + analysis_card
     
     async def post_init(self, application):
-        """Инициализация после запуска бота"""
+        """Initialization after bot startup"""
         if self.enable_monitor:
-            # Запускаем монитор как фоновую задачу
+            # Start monitor as background task
             asyncio.create_task(self.monitor_hot_news())
-            print(f"🔍 Автоуведомления включены (порог: {self.hotness_threshold}, интервал: {self.check_interval}с)")
+            print(f"🔍 Auto-notifications enabled (threshold: {self.hotness_threshold}, interval: {self.check_interval}s)")
     
     def run(self):
-        """Запуск бота"""
-        print("🤖 Telegram бот запущен...")
+        """Run bot"""
+        print("🤖 Telegram bot started...")
         
-        # Регистрируем post_init callback
+        # Register post_init callback
         self.app.post_init = self.post_init
         
         try:
@@ -805,10 +805,10 @@ class NewsBot:
                 close_loop=False
             )
         except Exception as e:
-            print(f"❌ Ошибка запуска бота: {e}")
-            print("Проверьте:")
-            print("1. Правильность TELEGRAM_BOT_TOKEN в .env")
-            print("2. Подключение к интернету")
-            print("3. Доступность Telegram API")
+            print(f"❌ Bot startup error: {e}")
+            print("Check:")
+            print("1. TELEGRAM_BOT_TOKEN is correct in .env")
+            print("2. Internet connection")
+            print("3. Telegram API availability")
             raise
 

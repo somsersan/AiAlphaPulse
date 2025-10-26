@@ -1,4 +1,4 @@
-"""Модуль для работы с Telegram ботом"""
+"""Module for working with Telegram bot"""
 
 
 

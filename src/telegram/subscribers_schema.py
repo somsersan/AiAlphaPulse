@@ -1,10 +1,10 @@
-"""Схема таблицы подписчиков на горячие новости"""
+"""Subscribers table schema for hot news"""
 import psycopg2
 from typing import List, Set
 
 
 def create_subscribers_table(conn: psycopg2.extensions.connection):
-    """Создание таблицы для подписчиков"""
+    """Create table for subscribers"""
     
     create_table_sql = """
     CREATE TABLE IF NOT EXISTS telegram_subscribers (
@@ -21,7 +21,7 @@ def create_subscribers_table(conn: psycopg2.extensions.connection):
     cursor = conn.cursor()
     cursor.execute(create_table_sql)
     
-    # Индекс для быстрого поиска активных подписчиков
+    # Index for fast lookup of active subscribers
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_subscribers_active 
         ON telegram_subscribers(is_active) 
@@ -29,12 +29,12 @@ def create_subscribers_table(conn: psycopg2.extensions.connection):
     """)
     
     conn.commit()
-    print("✅ Таблица telegram_subscribers создана")
+    print("✅ Table telegram_subscribers created")
 
 
 def add_subscriber(conn: psycopg2.extensions.connection, chat_id: int, 
                    username: str = None, first_name: str = None, last_name: str = None) -> bool:
-    """Добавить подписчика"""
+    """Add subscriber"""
     
     insert_sql = """
     INSERT INTO telegram_subscribers (chat_id, username, first_name, last_name, is_active)
@@ -58,7 +58,7 @@ def add_subscriber(conn: psycopg2.extensions.connection, chat_id: int,
 
 
 def remove_subscriber(conn: psycopg2.extensions.connection, chat_id: int) -> bool:
-    """Отписать пользователя (мягкое удаление)"""
+    """Unsubscribe user (soft delete)"""
     
     update_sql = """
     UPDATE telegram_subscribers 
@@ -76,7 +76,7 @@ def remove_subscriber(conn: psycopg2.extensions.connection, chat_id: int) -> boo
 
 
 def get_active_subscribers(conn: psycopg2.extensions.connection) -> List[int]:
-    """Получить список активных подписчиков"""
+    """Get list of active subscribers"""
     
     query = """
     SELECT chat_id 
@@ -92,12 +92,12 @@ def get_active_subscribers(conn: psycopg2.extensions.connection) -> List[int]:
 
 
 def get_active_subscribers_set(conn: psycopg2.extensions.connection) -> Set[int]:
-    """Получить множество активных подписчиков для быстрой проверки"""
+    """Get set of active subscribers for fast lookup"""
     return set(get_active_subscribers(conn))
 
 
 def is_subscribed(conn: psycopg2.extensions.connection, chat_id: int) -> bool:
-    """Проверить, подписан ли пользователь"""
+    """Check if user is subscribed"""
     
     query = """
     SELECT 1 FROM telegram_subscribers 
@@ -111,7 +111,7 @@ def is_subscribed(conn: psycopg2.extensions.connection, chat_id: int) -> bool:
 
 
 def update_last_notification(conn: psycopg2.extensions.connection, chat_id: int):
-    """Обновить время последнего уведомления"""
+    """Update last notification time"""
     
     update_sql = """
     UPDATE telegram_subscribers 
@@ -125,7 +125,7 @@ def update_last_notification(conn: psycopg2.extensions.connection, chat_id: int)
 
 
 def get_subscriber_stats(conn: psycopg2.extensions.connection) -> dict:
-    """Получить статистику подписчиков"""
+    """Get subscriber statistics"""
     
     query = """
     SELECT 

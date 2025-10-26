@@ -1,51 +1,6 @@
 version: '3.8'
 
 services:
-  # Парсер новостей (RSS + Telegram)
-  parser:
-    build:
-      context: .
-      dockerfile: Dockerfile.parser
-    container_name: alphapulse_parser
-    network_mode: "host"  # Используем host network для доступа к локальной БД
-    environment:
-      # PostgreSQL подключение (локальная БД на VM)
-      POSTGRES_HOST: ${POSTGRES_HOST:-localhost}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:-alphapulse}
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-04102025}
-      
-      # Telegram API (для парсинга каналов)
-      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
-      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
-      TELEGRAM_PHONE: ${TELEGRAM_PHONE}
-      
-      # Настройки парсера
-      PARSER_CHECK_INTERVAL: ${PARSER_CHECK_INTERVAL:-300}  # 5 минут
-      PARSER_BATCH_SIZE: ${PARSER_BATCH_SIZE:-50}
-    
-    volumes:
-      - ./logs:/app/logs
-      - ./.env:/app/.env:ro
-    
-    command: python -u parser_worker.py
-    
-    restart: unless-stopped
-    
-    healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -v grep | grep parser_worker.py || exit 1"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   # Воркер для обработки пайплайна (Нормализация → Дедупликация → LLM)
   pipeline:
     build:
@@ -141,17 +96,30 @@ services:
         max-size: "10m"
         max-file: "3"
 
-# ПРИМЕЧАНИЕ: PostgreSQL запущен локально на VM (localhost:5432)
-# Контейнеры используют network_mode: "host" для прямого доступа
-# Убедитесь, что PostgreSQL настроен на прослушивание localhost
-# и имеет созданную БД "alphapulse" с пользователем "admin"
+# ============================================================================
+# КОНФИГУРАЦИЯ AI ALPHA PULSE - 2 СЕРВИСА
+# ============================================================================
 #
-# ПОДПИСЧИКИ: Пользователи подписываются через команду /subscribe в боте
-# Подписки хранятся в таблице telegram_subscribers
-# TELEGRAM_CHAT_ID больше не обязателен (используется только для legacy)
+# АРХИТЕКТУРА:
+# 1. pipeline (pipeline_worker.py) - Обработка пайплайна: Нормализация → Дедупликация → LLM
+# 2. telegram_bot (run_telegram_bot.py) - Telegram бот для отправки новостей подписчикам
+#
+# УДАЛЕННЫЙ СЕРВИС:
+# - parser (parser_worker.py) - Парсер новостей запускается из другого контейнера на сервере
+#
+# ПОДКЛЮЧЕНИЕ К БД:
+# - PostgreSQL запущен локально на VM (localhost:5432)
+# - Контейнеры используют network_mode: "host" для прямого доступа
+# - БД: "alphapulse", пользователь: "admin"
+#
+# ПОДПИСЧИКИ:
+# - Пользователи подписываются через команду /subscribe в боте
+# - Подписки хранятся в таблице telegram_subscribers
 #
 # ПОТОК ДАННЫХ:
-# Parser → financial_news_view → normalized_articles → story_clusters → llm_analyzed_news → Telegram Bot
+# Parser (внешний) → financial_news_view → normalized_articles → 
+# story_clusters → llm_analyzed_news → Telegram Bot → Подписчики
+# ============================================================================
 
 
 
