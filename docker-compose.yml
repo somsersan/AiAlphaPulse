@@ -29,9 +29,6 @@ services:
       DATABASE_URL: postgresql://admin:04102025@postgres:5432/alphapulse
     ports:
       - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
     volumes:
       - ./logs:/app/logs
     networks:
@@ -46,19 +43,19 @@ services:
       "
 
   # pgAdmin для управления базой данных (опционально)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: rss_pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@rss.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-    ports:
-      - "8080:80"
-    depends_on:
-      - postgres
-    networks:
-      - rss_network
-    restart: unless-stopped
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: rss_pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@rss.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin123
+  #   ports:
+  #     - "8080:80"
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - rss_network
+  #   restart: unless-stopped
 
 volumes:
   postgres_data:
