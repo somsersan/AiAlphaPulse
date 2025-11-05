@@ -20,6 +20,8 @@ def recreate_llm_news_table(conn: psycopg2.extensions.connection):
             id_cluster INTEGER NOT NULL,
             headline TEXT NOT NULL,
             content TEXT,
+            headline_en TEXT,
+            content_en TEXT,
             urls_json TEXT,
             published_time TIMESTAMP,
             ai_hotness REAL,
@@ -62,6 +64,8 @@ def create_llm_news_table(conn: psycopg2.extensions.connection):
         id_cluster INTEGER NOT NULL,  -- ID из story_clusters
         headline TEXT NOT NULL,
         content TEXT,
+        headline_en TEXT,  -- Английская версия заголовка
+        content_en TEXT,  -- Английская версия содержимого
         urls_json TEXT,  -- JSON массив ссылок
         published_time TIMESTAMP,
         ai_hotness REAL,  -- Оценка горячности от LLM (0-1)
@@ -76,6 +80,33 @@ def create_llm_news_table(conn: psycopg2.extensions.connection):
     
     cursor = conn.cursor()
     cursor.execute(create_table_sql)
+    
+    # Добавляем колонки для английских версий, если их еще нет (миграция для существующих таблиц)
+    try:
+        cursor.execute("""
+            ALTER TABLE llm_analyzed_news 
+            ADD COLUMN IF NOT EXISTS headline_en TEXT;
+        """)
+        cursor.execute("""
+            ALTER TABLE llm_analyzed_news 
+            ADD COLUMN IF NOT EXISTS content_en TEXT;
+        """)
+        # Если headline_en пустой, заполняем его значением из headline (для существующих записей)
+        cursor.execute("""
+            UPDATE llm_analyzed_news 
+            SET headline_en = headline 
+            WHERE headline_en IS NULL OR headline_en = '';
+        """)
+        cursor.execute("""
+            UPDATE llm_analyzed_news 
+            SET content_en = content 
+            WHERE content_en IS NULL AND content IS NOT NULL;
+        """)
+        conn.commit()
+        print("✅ Миграция: добавлены поля headline_en и content_en")
+    except psycopg2.Error as e:
+        conn.rollback()
+        print(f"⚠️ Ошибка миграции (возможно, поля уже существуют): {e}")
     
     # Индексы для быстрого поиска
     indexes = [
@@ -163,9 +194,9 @@ def insert_llm_analyzed_news(conn: psycopg2.extensions.connection, data: dict):
     
     insert_sql = """
     INSERT INTO llm_analyzed_news 
-        (id_old, id_cluster, headline, content, urls_json, published_time, 
+        (id_old, id_cluster, headline, content, headline_en, content_en, urls_json, published_time, 
          ai_hotness, tickers_json, reasoning)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (id_cluster) DO NOTHING
     RETURNING id
     """
@@ -176,7 +207,9 @@ def insert_llm_analyzed_news(conn: psycopg2.extensions.connection, data: dict):
             data['id_old'],
             data['id_cluster'],
             data['headline'],
-            data['content'],
+            data.get('content'),
+            data.get('headline_en') or data['headline'],  # Используем английскую версию если есть, иначе оригинал
+            data.get('content_en') or data.get('content') or data['headline'],
             data['urls_json'],
             data['published_time'],
             data['ai_hotness'],

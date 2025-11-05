@@ -177,7 +177,7 @@ def ensure_cluster(
             json.dumps([url], ensure_ascii=False),
         ),
     )
-    conn.commit()
+    # commit убран - будет делаться батчами в основном цикле
     return cursor.fetchone()[0]
 
 
@@ -235,7 +235,7 @@ def add_member(
             cluster_id,
         ),
     )
-    conn.commit()
+    # commit убран - будет делаться батчами в основном цикле
 
 
 def select_links_and_update(conn: psycopg2.extensions.connection, cluster_id: int):
@@ -255,7 +255,7 @@ def select_links_and_update(conn: psycopg2.extensions.connection, cluster_id: in
         "UPDATE story_clusters SET earliest_url=%s, latest_url=%s, strongest_domain=%s WHERE id=%s",
         (earliest[0], latest[0], strongest[1], cluster_id),
     )
-    conn.commit()
+    # commit убран - будет делаться батчами в основном цикле
 
 
 # ---------- Скоринг ----------
@@ -313,20 +313,25 @@ def recompute_scores(conn: psycopg2.extensions.connection, cluster_id: int):
         "UPDATE story_clusters SET factors_json=%s, hotness=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s",
         (json.dumps(factors, ensure_ascii=False), hotness, cluster_id),
     )
-    conn.commit()
+    # commit убран - будет делаться батчами в основном цикле
 
 
 # ---------- Основной цикл обработки ----------
 
 def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K_NEIGHBORS, max_docs: int = None):
     # загрузить существующий индекс из БД (если есть)
-    index, _ = load_existing_vectors(conn)
+    index, last_indexed_id = load_existing_vectors(conn)
 
-    # state
+    # state - получаем последний обработанный ID
     cursor = conn.cursor()
     cursor.execute("SELECT last_vectorized_id FROM dedup_state WHERE id=1")
     row = cursor.fetchone()
-    last_vec = row[0] if row else 0
+    
+    # Используем максимальный ID из индекса или state, в зависимости от того, что больше
+    if row and row[0] is not None:
+        last_vec = max(row[0], last_indexed_id) if last_indexed_id else row[0]
+    else:
+        last_vec = last_indexed_id if last_indexed_id else 0
 
     new_docs = fetch_new_normalized(conn, last_vec, limit=max_docs)
     if not new_docs:
@@ -334,13 +339,16 @@ def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K
         return 0
     
     print(f"📊 Найдено новых статей: {len(new_docs)}")
+    print(f"📊 Последний обработанный ID: {last_vec}")
 
     if index is None:
         # ленивая инициализация индекса при первом векторе
         dim = embed_text("x", "y").shape[0]
         index = FaissIndex(dim)
+        print(f"🔧 Инициализирован новый FAISS индекс с размерностью {dim}")
 
     processed = 0
+    commit_interval = 10  # Делаем commit каждые 10 статей
 
     for d in new_docs:
         nid = int(d["id"])  # normalized_articles.id
@@ -361,8 +369,10 @@ def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K
         )
         index.add_one(v, nid)
 
-        # поиск соседей в индексе
-        neighbors = index.search(v, k_neighbors)
+        # поиск соседей в индексе (только если индекс не пустой)
+        neighbors = []
+        if index.size() > 1:  # Нужно минимум 2 элемента для поиска (включая текущий)
+            neighbors = index.search(v, k_neighbors)
 
         # решение о кластере
         cid, reason = decide_cluster(conn, neighbors, lang, t_doc)
@@ -386,8 +396,20 @@ def process_new_batch(conn: psycopg2.extensions.connection, k_neighbors: int = K
         processed += 1
 
         # обновить state для инкрементальной обработки
-        cursor.execute("UPDATE dedup_state SET last_vectorized_id=%s WHERE id=1", (nid,))
-        conn.commit()
+        cursor.execute(
+            "INSERT INTO dedup_state(id, last_vectorized_id) VALUES(1, %s) "
+            "ON CONFLICT (id) DO UPDATE SET last_vectorized_id=EXCLUDED.last_vectorized_id",
+            (nid,)
+        )
+        
+        # Делаем commit батчами для оптимизации
+        if processed % commit_interval == 0:
+            conn.commit()
+            if processed % 50 == 0:
+                print(f"   Обработано: {processed}/{len(new_docs)}")
+
+    # Финальный commit
+    conn.commit()
 
     print(f"Обработано новых нормализованных статей: {processed}")
     return processed

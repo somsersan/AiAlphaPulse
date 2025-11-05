@@ -4,7 +4,7 @@ import time
 from typing import Dict, Optional
 import psycopg2
 
-from .openrouter_client import OpenRouterClient
+from .proxyapi_client import ProxyAPIClient
 from .schema import (
     create_llm_news_table,
     get_unprocessed_clusters,
@@ -19,7 +19,7 @@ class LLMNewsProcessor:
     def __init__(self, conn: psycopg2.extensions.connection, api_key: str = None, 
                  model: str = None):
         self.conn = conn
-        self.llm_client = OpenRouterClient(api_key=api_key, model=model)
+        self.llm_client = ProxyAPIClient(api_key=api_key, model=model)
         
         # Create table if not exists
         create_llm_news_table(conn)
@@ -50,7 +50,24 @@ class LLMNewsProcessor:
                 content=article['content'] or article['title']
             )
             
-            # Get all URLs from cluster
+            # Извлекаем английские версии
+            headline_en = analysis.get('headline_en', '')
+            content_en = analysis.get('content_en', '')
+            
+            # Если английские версии пустые, используем оригинальные
+            if not headline_en or headline_en.strip() == '':
+                headline_en = article['title']
+                print(f"  ⚠️  WARNING: headline_en пустой, используем оригинал")
+            else:
+                print(f"  ✅ Получен headline_en: {headline_en[:60]}...")
+                
+            if not content_en or content_en.strip() == '':
+                content_en = article['content'] or article['title']
+                print(f"  ⚠️  WARNING: content_en пустой, используем оригинал")
+            else:
+                print(f"  ✅ Получен content_en: {content_en[:60]}...")
+            
+            print(f"  🔍 Перед сохранением: headline_en={repr(headline_en[:50])}, content_en={repr(content_en[:50]) if content_en else None}")
             cursor = self.conn.cursor()
             try:
                 cursor.execute("""
@@ -64,17 +81,23 @@ class LLMNewsProcessor:
                 urls = []
             
             # Prepare data for insertion
+            print(f"  🔍 DEBUG: headline_en перед сохранением = {repr(headline_en[:50]) if headline_en else 'None/Empty'}")
+            print(f"  🔍 DEBUG: content_en перед сохранением = {repr(content_en[:50]) if content_en else 'None/Empty'}")
             data = {
                 'id_old': article['normalized_id'],
                 'id_cluster': cluster_id,
                 'headline': article['title'],
                 'content': article['content'],
+                'headline_en': headline_en,
+                'content_en': content_en,
                 'urls_json': json.dumps(urls, ensure_ascii=False),
                 'published_time': article['published_at'],
                 'ai_hotness': analysis['hotness'],
                 'tickers_json': json.dumps(analysis['tickers'], ensure_ascii=False),
                 'reasoning': analysis.get('reasoning', '')  # Add reasoning
             }
+            print(f"  🔍 DEBUG: data['headline_en'] = {repr(data.get('headline_en', 'KEY_NOT_FOUND')[:50])}")
+            print(f"  🔍 DEBUG: data['content_en'] = {repr(data.get('content_en', 'KEY_NOT_FOUND')[:50])}")
             
             # Insert into DB
             new_id = insert_llm_analyzed_news(self.conn, data)

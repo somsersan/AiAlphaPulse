@@ -42,7 +42,7 @@ Usage examples:
     parser.add_argument('--delay', type=float, default=float(os.getenv('LLM_DELAY', '1.0')),
                         help='Delay between requests in seconds (default: from LLM_DELAY or 1.0)')
     parser.add_argument('--api-key', 
-                        help='OpenRouter API key (or use OPENROUTER_API_KEY)')
+                        help='ProxyAPI key (or use PROXYAPI_KEY)')
     parser.add_argument('--show-top', type=int, metavar='N',
                         help='Show top N hottest news')
     parser.add_argument('--min-hotness', type=float, default=0.7,
@@ -51,11 +51,11 @@ Usage examples:
     args = parser.parse_args()
     
     # Check API key
-    api_key = args.api_key or os.getenv('OPENROUTER_API_KEY')
+    api_key = args.api_key or os.getenv('PROXYAPI_KEY')
     if not api_key and not args.show_top:
-        print("❌ Error: set OPENROUTER_API_KEY or use --api-key")
+        print("❌ Error: set PROXYAPI_KEY or use --api-key")
         print("\nExample:")
-        print("  export OPENROUTER_API_KEY='your-key-here'")
+        print("  export PROXYAPI_KEY='your-key-here'")
         print("  python -m src.llm.runner --limit 5")
         sys.exit(1)
     

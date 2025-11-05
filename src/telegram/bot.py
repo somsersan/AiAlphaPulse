@@ -2,11 +2,13 @@
 import os
 import json
 import asyncio
+import re
 from datetime import datetime, timedelta
 from typing import List, Dict, Set
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from html import escape
 from dotenv import load_dotenv
 
@@ -62,6 +64,159 @@ class NewsBot:
         self.hotness_threshold = hotness_threshold
         self.check_interval = check_interval
         self.notified_news: Set[int] = set()
+    
+    def _sanitize_markdown(self, text: str) -> str:
+        """
+        Sanitize Markdown text to prevent Telegram parsing errors.
+        Fixes common issues like unclosed tags, unescaped special characters.
+        """
+        if not text:
+            return text
+        
+        # Log original text for debugging
+        print(f"\n🔍 Валидация Markdown...")
+        print(f"   Исходная длина: {len(text)} символов")
+        
+        # First, let's try to fix common issues
+        
+        # 1. Fix unclosed bold/italic tags
+        # Count asterisks and underscores, but be smarter about it
+        # Look for patterns like *text* or _text_ 
+        asterisk_count = text.count('*')
+        underscore_count = text.count('_')
+        
+        # Simple fix: if odd number, add closing tag at the end
+        # This is not perfect but should work for most cases
+        if asterisk_count % 2 != 0:
+            print(f"   ⚠️ Обнаружено нечетное количество '*' ({asterisk_count}), добавляю закрывающий тег")
+            text = text + '*'
+        
+        if underscore_count % 2 != 0:
+            print(f"   ⚠️ Обнаружено нечетное количество '_' ({underscore_count}), добавляю закрывающий тег")
+            text = text + '_'
+        
+        # 2. Fix unclosed code blocks (```)
+        code_block_count = text.count('```')
+        if code_block_count % 2 != 0:
+            print(f"   ⚠️ Обнаружен незакрытый блок кода '```', добавляю закрывающий тег")
+            text = text + '\n```'
+        
+        # 3. Fix unclosed inline code (`)
+        # Count single backticks that are not part of ```
+        inline_code_count = len(re.findall(r'(?<!`)`(?!`)', text))
+        if inline_code_count % 2 != 0:
+            print(f"   ⚠️ Обнаружено нечетное количество инлайн кода '`', добавляю закрывающий тег")
+            text = text + '`'
+        
+        # 4. Fix unclosed links [text](url)
+        # Count opening and closing brackets
+        open_brackets = text.count('[')
+        close_brackets = text.count(']')
+        open_parens = text.count('(')
+        close_parens = text.count(')')
+        
+        if open_brackets > close_brackets:
+            print(f"   ⚠️ Обнаружены незакрытые квадратные скобки '[', добавляю закрывающую")
+            text = text + ']'
+        
+        if open_parens > close_parens:
+            print(f"   ⚠️ Обнаружены незакрытые круглые скобки '(', добавляю закрывающую")
+            text = text + ')'
+        
+        # 5. Remove problematic control characters
+        text = text.replace('\x00', '')  # Null bytes
+        text = text.replace('\ufeff', '')  # BOM
+        
+        # 6. Log potential issues
+        if '*' in text or '_' in text or '`' in text:
+            # Check for potential issues with special characters at end of line or problematic positions
+            issues = []
+            if text.endswith('*') and asterisk_count % 2 == 0:
+                issues.append("возможная проблема с '*' в конце")
+            if text.endswith('_') and underscore_count % 2 == 0:
+                issues.append("возможная проблема с '_' в конце")
+            if issues:
+                print(f"   ⚠️ Потенциальные проблемы: {', '.join(issues)}")
+        
+        print(f"   ✅ Markdown после очистки: {len(text)} символов")
+        
+        return text
+    
+    def _escape_markdown_special_chars(self, text: str) -> str:
+        """
+        Escape special Markdown characters for plain text mode.
+        Used as fallback when Markdown parsing fails.
+        """
+        # Escape special characters: * _ [ ] ( ) ~ ` > # + - = | { } . !
+        special_chars = ['*', '_', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        for char in special_chars:
+            text = text.replace(char, '\\' + char)
+        return text
+    
+    async def _safe_send_markdown(self, query, text: str, parse_mode=ParseMode.MARKDOWN) -> bool:
+        """
+        Safely send message with Markdown. Falls back to plain text if parsing fails.
+        Returns True if successful, False if fallback was used.
+        """
+        try:
+            # First, sanitize the text
+            sanitized_text = self._sanitize_markdown(text)
+            
+            # Try to send with Markdown
+            try:
+                await query.edit_message_text(
+                    sanitized_text,
+                    parse_mode=parse_mode,
+                    disable_web_page_preview=True
+                )
+                print(f"   ✅ Сообщение успешно отправлено с Markdown")
+                return True
+            except BadRequest as e:
+                error_msg = str(e)
+                print(f"\n❌ ОШИБКА парсинга Markdown: {error_msg}")
+                
+                # Check if it's a parsing error
+                if "can't parse entities" in error_msg.lower() or "can't find end" in error_msg.lower():
+                    print(f"   ⚠️ Используем fallback: plain text без Markdown")
+                    
+                    # Try to extract problematic position from error message
+                    byte_offset_match = re.search(r'byte offset (\d+)', error_msg)
+                    if byte_offset_match:
+                        offset = int(byte_offset_match.group(1))
+                        print(f"   📍 Проблемная позиция: {offset} байт")
+                        # Show context around problematic position
+                        start = max(0, offset - 50)
+                        end = min(len(text), offset + 50)
+                        print(f"   Контекст: ...{text[start:end]}...")
+                    
+                    # Fallback: send as plain text with escaped special chars
+                    escaped_text = self._escape_markdown_special_chars(text)
+                    await query.edit_message_text(
+                        escaped_text,
+                        parse_mode=None,  # Plain text
+                        disable_web_page_preview=True
+                    )
+                    print(f"   ✅ Сообщение отправлено как plain text")
+                    return False
+                else:
+                    # Re-raise if it's not a parsing error
+                    raise
+                    
+        except Exception as e:
+            print(f"\n❌ КРИТИЧЕСКАЯ ОШИБКА при отправке сообщения: {e}")
+            print(f"   Тип ошибки: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            
+            # Last resort fallback
+            try:
+                await query.edit_message_text(
+                    "❌ Ошибка при генерации анализа. Попробуйте позже.",
+                    parse_mode=None
+                )
+            except:
+                pass
+            return False
     
     def _init_subscribers_table(self):
         """Initialize subscribers table"""
@@ -466,6 +621,12 @@ To subscribe: /subscribe
                 return
             
             # Generate analysis via LLM
+            print(f"\n{'='*60}")
+            print(f"🔍 ГЕНЕРАЦИЯ АНАЛИЗА ДЛЯ НОВОСТИ ID={news_id}")
+            print(f"{'='*60}")
+            print(f"📰 Заголовок: {news['headline'][:50]}...")
+            print(f"🔢 Hotness: {news['ai_hotness']}")
+            
             analysis = self.analyzer.generate_full_analysis({
                 'headline': news['headline'],
                 'content': news['content'],
@@ -476,12 +637,25 @@ To subscribe: /subscribe
                 'source': news.get('source', 'Unknown source')
             })
             
+            analysis_text = analysis.get('analysis_text', 'Analysis unavailable')
+            print(f"\n📋 Получен анализ:")
+            print(f"   Длина текста: {len(analysis_text)} символов")
+            print(f"   Первые 200 символов: {analysis_text[:200]}...")
+            
             # Format and send (analysis now contains ready card)
-            await query.edit_message_text(
-                analysis.get('analysis_text', 'Analysis unavailable'),
-                parse_mode=ParseMode.MARKDOWN,
-                disable_web_page_preview=True
+            # Use safe sending with Markdown validation
+            success = await self._safe_send_markdown(
+                query,
+                analysis_text,
+                parse_mode=ParseMode.MARKDOWN
             )
+            
+            if success:
+                print(f"✅ Анализ успешно отправлен с Markdown форматированием")
+            else:
+                print(f"⚠️ Анализ отправлен как plain text (Markdown форматирование не удалось)")
+            
+            print(f"{'='*60}\n")
     
     def get_top_news(self, limit: int, hours: int) -> List[Dict]:
         """Get top news from DB"""
@@ -491,8 +665,8 @@ To subscribe: /subscribe
             cursor.execute("""
                 SELECT 
                     lan.id,
-                    lan.headline,
-                    lan.content,
+                    COALESCE(lan.headline_en, lan.headline) as headline,
+                    COALESCE(lan.content_en, lan.content) as content,
                     lan.ai_hotness,
                     lan.tickers_json,
                     lan.urls_json,
@@ -531,8 +705,8 @@ To subscribe: /subscribe
             cursor.execute("""
                 SELECT 
                     lan.id,
-                    lan.headline,
-                    lan.content,
+                    COALESCE(lan.headline_en, lan.headline) as headline,
+                    COALESCE(lan.content_en, lan.content) as content,
                     lan.ai_hotness,
                     lan.tickers_json,
                     lan.urls_json,
@@ -578,8 +752,9 @@ To subscribe: /subscribe
             for keyword in keywords:
                 # Escape special regex characters and create pattern
                 # ~* is PostgreSQL's case-insensitive regex operator
-                conditions.append("(lan.headline ~* %s OR lan.content ~* %s)")
-                params.extend([keyword, keyword])
+                # Search in both original and English versions
+                conditions.append("(lan.headline ~* %s OR lan.content ~* %s OR COALESCE(lan.headline_en, '') ~* %s OR COALESCE(lan.content_en, '') ~* %s)")
+                params.extend([keyword, keyword, keyword, keyword])
             
             where_clause = " OR ".join(conditions)
             params.append(limit)
@@ -587,8 +762,8 @@ To subscribe: /subscribe
             query = f"""
                 SELECT 
                     lan.id,
-                    lan.headline,
-                    lan.content,
+                    COALESCE(lan.headline_en, lan.headline) as headline,
+                    COALESCE(lan.content_en, lan.content) as content,
                     lan.ai_hotness,
                     lan.tickers_json,
                     lan.urls_json,
@@ -631,13 +806,15 @@ To subscribe: /subscribe
             cursor.execute("""
                 SELECT 
                     lan.id,
-                    lan.headline,
-                    lan.content,
+                    COALESCE(lan.headline_en, lan.headline) as headline,
+                    COALESCE(lan.content_en, lan.content) as content,
                     lan.ai_hotness,
                     lan.tickers_json,
                     lan.urls_json,
-                    lan.published_time
+                    lan.published_time,
+                    COALESCE(na.source, 'Unknown source') as source
                 FROM llm_analyzed_news lan
+                LEFT JOIN normalized_articles na ON lan.id_old = na.id
                 WHERE lan.id = %s
             """, (news_id,))
             
@@ -651,7 +828,9 @@ To subscribe: /subscribe
                 'content': row['content'],
                 'ai_hotness': row['ai_hotness'],
                 'tickers': json.loads(row['tickers_json']) if row['tickers_json'] else [],
-                'urls': json.loads(row['urls_json']) if row['urls_json'] else []
+                'urls': json.loads(row['urls_json']) if row['urls_json'] else [],
+                'published_time': row['published_time'],
+                'source': row.get('source', 'Unknown source')
             }
     
     def format_news_message(self, news: Dict, index: int, total: int) -> str:
@@ -661,6 +840,15 @@ To subscribe: /subscribe
         
         # Escape for HTML
         headline_escaped = escape(news['headline'])
+        
+        # Content (English version)
+        content = news.get('content', '')
+        if content:
+            content_escaped = escape(content[:500])  # Limit to 500 chars
+            if len(content) > 500:
+                content_escaped += '...'
+        else:
+            content_escaped = None
         
         # Tickers
         tickers_list = news.get('tickers', [])
@@ -689,6 +877,7 @@ To subscribe: /subscribe
 {hotness_emoji} <b>#{index}/{total} News</b>
 
 <b>{headline_escaped}</b>
+{content_escaped if content_escaped else ''}
 
 🔥 <b>Hotness:</b> {hotness:.2f}/1.00
 📊 <b>Tickers:</b> {tickers_str}
@@ -710,6 +899,15 @@ To subscribe: /subscribe
         
         # Escape for HTML
         headline_escaped = escape(news['headline'])
+        
+        # Content (English version)
+        content = news.get('content', '')
+        if content:
+            content_escaped = escape(content[:500])  # Limit to 500 chars
+            if len(content) > 500:
+                content_escaped += '...'
+        else:
+            content_escaped = None
         
         # Tickers
         tickers_list = news.get('tickers', [])
@@ -738,6 +936,7 @@ To subscribe: /subscribe
 {hotness_emoji} <b>#{index}/{total} News</b>
 
 <b>{headline_escaped}</b>
+{content_escaped if content_escaped else ''}
 
 🔥 <b>Hotness:</b> {hotness:.2f}/1.00
 📊 <b>Tickers:</b> {tickers_str}
@@ -759,6 +958,15 @@ To subscribe: /subscribe
         
         # Escape for HTML
         headline_escaped = escape(news['headline'])
+        
+        # Content (English version)
+        content = news.get('content', '')
+        if content:
+            content_escaped = escape(content[:500])  # Limit to 500 chars
+            if len(content) > 500:
+                content_escaped += '...'
+        else:
+            content_escaped = None
         
         # Tickers
         tickers_list = news.get('tickers', [])
@@ -783,6 +991,7 @@ To subscribe: /subscribe
 🔍 <b>#{index}/{total} Search Result</b>
 
 <b>{headline_escaped}</b>
+{content_escaped if content_escaped else ''}
 
 🔥 <b>Hotness:</b> {hotness:.2f}/1.00
 📊 <b>Tickers:</b> {tickers_str}
@@ -902,18 +1111,20 @@ To subscribe: /subscribe
             cursor.execute("""
                 SELECT 
                     lan.id,
-                    lan.headline,
-                    lan.content,
+                    COALESCE(lan.headline_en, lan.headline) as headline,
+                    COALESCE(lan.content_en, lan.content) as content,
                     lan.ai_hotness,
                     lan.tickers_json,
                     lan.urls_json,
                     lan.published_time,
                     lan.created_at,
+                    COALESCE(na.source, 'Unknown source') as source,
                     sc.doc_count,
                     sc.first_time,
                     sc.last_time
                 FROM llm_analyzed_news lan
                 JOIN story_clusters sc ON lan.id_cluster = sc.id
+                LEFT JOIN normalized_articles na ON lan.id_old = na.id
                 WHERE lan.ai_hotness >= %s
                     AND lan.created_at >= NOW() - INTERVAL '%s seconds'
                 ORDER BY lan.created_at DESC
@@ -930,6 +1141,7 @@ To subscribe: /subscribe
                     'tickers': json.loads(row['tickers_json']) if row['tickers_json'] else [],
                     'urls': json.loads(row['urls_json']) if row['urls_json'] else [],
                     'published_time': row['published_time'],
+                    'source': row.get('source', 'Unknown source'),
                     'doc_count': row['doc_count'],
                     'first_time': row['first_time'],
                     'last_time': row['last_time']

@@ -16,8 +16,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-04102025}
       
-      # OpenRouter API
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      # ProxyAPI.ru
+      PROXYAPI_KEY: ${PROXYAPI_KEY}
       LLM_MODEL: ${LLM_MODEL:-anthropic/claude-3.5-haiku}
       LLM_ANALYSIS_MODEL: ${LLM_ANALYSIS_MODEL:-anthropic/claude-3.5-sonnet}
       LLM_DELAY: ${LLM_DELAY:-1.0}
@@ -30,6 +30,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
+      - ./src:/app/src:ro  # Монтируем исходный код для быстрого обновления
     
     command: python -u pipeline_worker.py
     
@@ -67,8 +68,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}  # Опционально для обратной совместимости
       
-      # OpenRouter API для генерации анализа
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      # ProxyAPI.ru для генерации анализа
+      PROXYAPI_KEY: ${PROXYAPI_KEY}
       LLM_MODEL: ${LLM_MODEL:-anthropic/claude-3.5-haiku}
       LLM_ANALYSIS_MODEL: ${LLM_ANALYSIS_MODEL:-anthropic/claude-3.5-sonnet}
       
@@ -78,6 +79,7 @@ services:
     
     volumes:
       - ./.env:/app/.env:ro
+      - ./src:/app/src:ro  # Монтируем исходный код для быстрого обновления
     
     command: python -u run_telegram_bot.py
     

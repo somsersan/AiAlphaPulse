@@ -83,7 +83,22 @@ class PipelineWorker:
         print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 🔍 Дедупликация...")
         
         try:
-            self.db_conn.connect()
+            # Переподключаемся при необходимости
+            if not self.db_conn._connection:
+                self.db_conn.connect()
+            else:
+                try:
+                    cursor = self.db_conn._connection.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.close()
+                except:
+                    # Соединение потеряно, переподключаемся
+                    try:
+                        self.db_conn.close()
+                    except:
+                        pass
+                    self.db_conn.connect()
+            
             init_dedup(self.db_conn._connection)
             
             n = process_new_batch(self.db_conn._connection, k_neighbors=30)
@@ -93,16 +108,35 @@ class PipelineWorker:
             
         except Exception as e:
             print(f"   ❌ Ошибка дедупликации: {e}")
+            import traceback
+            traceback.print_exc()
+            # Закрываем соединение при ошибке для переподключения
+            try:
+                self.db_conn.close()
+            except:
+                pass
             return 0
-        finally:
-            self.db_conn.close()
     
     def run_llm_analysis(self) -> int:
         """Запуск LLM анализа новых кластеров"""
         print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 🤖 LLM анализ...")
         
         try:
-            self.db_conn.connect()
+            # Переподключаемся при необходимости
+            if not self.db_conn._connection:
+                self.db_conn.connect()
+            else:
+                try:
+                    cursor = self.db_conn._connection.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.close()
+                except:
+                    # Соединение потеряно, переподключаемся
+                    try:
+                        self.db_conn.close()
+                    except:
+                        pass
+                    self.db_conn.connect()
             
             processor = LLMNewsProcessor(
                 conn=self.db_conn._connection,
@@ -120,9 +154,14 @@ class PipelineWorker:
             
         except Exception as e:
             print(f"   ❌ Ошибка LLM анализа: {e}")
+            import traceback
+            traceback.print_exc()
+            # Закрываем соединение при ошибке для переподключения
+            try:
+                self.db_conn.close()
+            except:
+                pass
             return 0
-        finally:
-            self.db_conn.close()
     
     def run_cycle(self):
         """Один цикл обработки"""

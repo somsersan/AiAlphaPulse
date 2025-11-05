@@ -22,7 +22,7 @@ https://t.me/AIAlphaPulseBot или @AIAlphaPulseBot
 
 - Python 3.11+
 - PostgreSQL 12+ (с БД и данными от парсера)
-- OpenRouter API ключ ([получить здесь](https://openrouter.ai))
+- ProxyAPI.ru ключ ([получить здесь](https://console.proxyapi.ru))
 - Telegram Bot токен (от [@BotFather](https://t.me/BotFather))
 - Telegram API ID/Hash (для парсинга каналов, [получить здесь](https://my.telegram.org))
 
@@ -52,8 +52,8 @@ POSTGRES_DB=alphapulse
 POSTGRES_USER=admin
 POSTGRES_PASSWORD=your-password
 
-# OpenRouter API
-OPENROUTER_API_KEY=sk-or-v1-your-key
+# ProxyAPI.ru
+PROXYAPI_KEY=your-proxyapi-key
 LLM_MODEL=anthropic/claude-3.5-haiku
 LLM_ANALYSIS_MODEL=anthropic/claude-3.5-sonnet
 LLM_DELAY=1.0
@@ -220,7 +220,7 @@ src/
 ├── database/          # PostgreSQL подключение
 ├── normalization/     # Очистка и нормализация текста
 ├── dedup/             # FAISS векторизация + кластеризация
-├── llm/               # OpenRouter AI анализ
+├── llm/               # ProxyAPI.ru AI анализ
 ├── telegram/          # Telegram бот
 └── frontend/          # Веб-интерфейс
 ```
@@ -301,8 +301,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 response = requests.post(
-    'https://openrouter.ai/api/v1/chat/completions',
-    headers={'Authorization': f'Bearer {os.getenv(\"OPENROUTER_API_KEY\")}'},
+    'https://api.proxyapi.ru/openrouter/v1/chat/completions',
+    headers={'Authorization': f'Bearer {os.getenv(\"PROXYAPI_KEY\")}'},
     json={'model': 'anthropic/claude-3.5-haiku', 'messages': [{'role': 'user', 'content': 'Hi'}], 'max_tokens': 5}
 )
 print('✅ Модель доступна' if response.status_code == 200 else f'❌ Ошибка: {response.status_code}')

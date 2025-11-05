@@ -8,6 +8,7 @@ soupsieve==2.8
 sgmllib3k==1.0.0
 
 # Машинное обучение и векторизация
+numpy>=1.24.0
 faiss-cpu
 sentence-transformers
 

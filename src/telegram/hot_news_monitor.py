@@ -1,10 +1,12 @@
 """Hot news monitor for automatic notifications"""
 import asyncio
 import json
+import re
 from datetime import datetime
 from typing import Set
 from telegram import Bot
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from dotenv import load_dotenv
 import os
 
@@ -60,24 +62,44 @@ class HotNewsMonitor:
                 # Format message
                 message = self.format_hot_news_alert(news, analysis)
                 
-                # Send
-                await self.bot.send_message(
-                    chat_id=self.chat_id,
-                    text=message,
-                    parse_mode=ParseMode.MARKDOWN,
-                    disable_web_page_preview=True
-                )
+                # Sanitize Markdown before sending
+                sanitized_message = self._sanitize_markdown(message)
+                
+                # Send with error handling
+                try:
+                    await self.bot.send_message(
+                        chat_id=self.chat_id,
+                        text=sanitized_message,
+                        parse_mode=ParseMode.MARKDOWN,
+                        disable_web_page_preview=True
+                    )
+                    print(f"✅ Notification sent")
+                except BadRequest as e:
+                    error_msg = str(e)
+                    if "can't parse entities" in error_msg.lower() or "can't find end" in error_msg.lower():
+                        print(f"⚠️ Markdown parsing error, sending as plain text")
+                        # Fallback to plain text
+                        escaped_message = self._escape_markdown_special_chars(message)
+                        await self.bot.send_message(
+                            chat_id=self.chat_id,
+                            text=escaped_message,
+                            parse_mode=None,
+                            disable_web_page_preview=True
+                        )
+                        print(f"✅ Notification sent (plain text)")
+                    else:
+                        raise
                 
                 # Mark as sent
                 self.notified_news.add(news['id'])
-                
-                print(f"✅ Notification sent")
                 
                 # Small delay between messages
                 await asyncio.sleep(2)
                 
             except Exception as e:
                 print(f"❌ Notification send error: {e}")
+                import traceback
+                traceback.print_exc()
     
     def get_hot_news(self):
         """Get unprocessed hot news"""
@@ -85,17 +107,19 @@ class HotNewsMonitor:
             cursor.execute("""
                 SELECT 
                     lan.id,
-                    lan.headline,
-                    lan.content,
+                    COALESCE(lan.headline_en, lan.headline) as headline,
+                    COALESCE(lan.content_en, lan.content) as content,
                     lan.ai_hotness,
                     lan.tickers_json,
                     lan.urls_json,
                     lan.published_time,
+                    COALESCE(na.source, 'Unknown source') as source,
                     sc.doc_count,
                     sc.first_time,
                     sc.last_time
                 FROM llm_analyzed_news lan
                 JOIN story_clusters sc ON lan.id_cluster = sc.id
+                LEFT JOIN normalized_articles na ON lan.id_old = na.id
                 WHERE lan.ai_hotness >= %s
                 ORDER BY lan.created_at DESC
                 LIMIT 10
@@ -111,6 +135,7 @@ class HotNewsMonitor:
                     'tickers': json.loads(row['tickers_json']) if row['tickers_json'] else [],
                     'urls': json.loads(row['urls_json']) if row['urls_json'] else [],
                     'published_time': row['published_time'],
+                    'source': row.get('source', 'Unknown source'),
                     'doc_count': row['doc_count'],
                     'first_time': row['first_time'],
                     'last_time': row['last_time']
@@ -142,6 +167,56 @@ class HotNewsMonitor:
         analysis_card = analysis.get('analysis_text', 'Analysis unavailable')
         
         return header + analysis_card
+    
+    def _sanitize_markdown(self, text: str) -> str:
+        """Sanitize Markdown text to prevent Telegram parsing errors"""
+        if not text:
+            return text
+        
+        # Fix unclosed bold/italic tags
+        asterisk_count = text.count('*')
+        underscore_count = text.count('_')
+        
+        if asterisk_count % 2 != 0:
+            text = text + '*'
+        
+        if underscore_count % 2 != 0:
+            text = text + '_'
+        
+        # Fix unclosed code blocks
+        code_block_count = text.count('```')
+        if code_block_count % 2 != 0:
+            text = text + '\n```'
+        
+        # Fix unclosed inline code
+        inline_code_count = len(re.findall(r'(?<!`)`(?!`)', text))
+        if inline_code_count % 2 != 0:
+            text = text + '`'
+        
+        # Fix unclosed links
+        open_brackets = text.count('[')
+        close_brackets = text.count(']')
+        open_parens = text.count('(')
+        close_parens = text.count(')')
+        
+        if open_brackets > close_brackets:
+            text = text + ']'
+        
+        if open_parens > close_parens:
+            text = text + ')'
+        
+        # Remove problematic control characters
+        text = text.replace('\x00', '')
+        text = text.replace('\ufeff', '')
+        
+        return text
+    
+    def _escape_markdown_special_chars(self, text: str) -> str:
+        """Escape special Markdown characters for plain text mode"""
+        special_chars = ['*', '_', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        for char in special_chars:
+            text = text.replace(char, '\\' + char)
+        return text
     
     async def run(self):
         """Run monitoring in loop"""

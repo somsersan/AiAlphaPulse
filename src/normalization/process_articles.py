@@ -87,14 +87,25 @@ class ArticleProcessor:
             # Получаем максимальный ID в исходной таблице
             cursor.execute("SELECT MAX(id) FROM financial_news_view")
             max_original_id = cursor.fetchone()['max'] or 0
+            
+            # Получаем реальное количество необработанных статей (через NOT EXISTS)
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM financial_news_view f
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM normalized_articles n 
+                    WHERE n.original_id = f.id
+                )
+            """)
+            unprocessed_count = cursor.fetchone()['count']
         
         return {
             'max_processed_id': max_processed_id,
             'processed_count': processed_count,
             'total_articles': total_articles,
             'max_original_id': max_original_id,
-            'unprocessed_count': max_original_id - max_processed_id,
-            'is_up_to_date': max_processed_id >= max_original_id
+            'unprocessed_count': unprocessed_count,
+            'is_up_to_date': unprocessed_count == 0
         }
     
     def process_articles_batch(self, articles: List[Dict], batch_size: int = 100) -> Dict:

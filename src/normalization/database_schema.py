@@ -84,21 +84,23 @@ def get_max_processed_id(conn: psycopg2.extensions.connection) -> int:
 
 
 def get_unprocessed_articles(conn: psycopg2.extensions.connection, limit: int = None) -> List[Dict]:
-    """Получение необработанных статей (ID больше максимального обработанного)"""
-    max_id = get_max_processed_id(conn)
+    """Получение необработанных статей (которые не находятся в normalized_articles)"""
     
     query = """
-    SELECT id, title, link, source, published, is_processed, summary, content
-    FROM financial_news_view
-    WHERE id > %s
-    ORDER BY id ASC
+    SELECT f.id, f.title, f.link, f.source, f.published, f.is_processed, f.summary, f.content
+    FROM financial_news_view f
+    WHERE NOT EXISTS (
+        SELECT 1 FROM normalized_articles n 
+        WHERE n.original_id = f.id
+    )
+    ORDER BY f.id ASC
     """
     
     if limit:
         query += f" LIMIT {limit}"
     
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cursor.execute(query, (max_id,))
+    cursor.execute(query)
     rows = cursor.fetchall()
     return [dict(row) for row in rows]
 
